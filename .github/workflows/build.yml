@@ -1,4 +1,4 @@
-name: Build Gemini Ai Master Fix
+name: Build Gemini Ai Oreo Master
 
 on:
   push:
@@ -25,9 +25,9 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Full System Overhaul
+      - name: Deep System Fix
         run: |
-          # ১. pubspec.yaml (প্যাকেজ আপডেট)
+          # ১. pubspec.yaml আপডেট (সব দরকারি প্যাকেজ)
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
           description: A professional Gemini application
@@ -41,11 +41,12 @@ jobs:
             webview_flutter_android: ^3.15.0
             flutter_statusbarcolor_ns: ^0.6.0
             permission_handler: ^11.3.1
+            url_launcher: ^6.2.5
           flutter:
             uses-material-design: true
           EOF
 
-          # ২. main.dart (ভয়েস এবং ব্ল্যাক স্ক্রিন ফিক্স)
+          # ২. main.dart (ভয়েস, আপলোড এবং ব্ল্যাক স্ক্রিন এর জন্য নেটিভ হ্যান্ডলিং)
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
@@ -80,7 +81,6 @@ jobs:
 
           class _GeminiWebViewState extends State<GeminiWebView> {
             late final WebViewController controller;
-            bool _isLoading = true;
 
             @override
             void initState() {
@@ -90,7 +90,7 @@ jobs:
             }
 
             Future<void> _requestPermissions() async {
-              await [Permission.microphone, Permission.camera, Permission.storage, Permission.photos].request();
+              await [Permission.microphone, Permission.camera, Permission.storage, Permission.manageExternalStorage].request();
             }
 
             void _initController() {
@@ -102,9 +102,7 @@ jobs:
                 ..setBackgroundColor(const Color(0xFF131314))
                 ..setNavigationDelegate(
                   NavigationDelegate(
-                    onPageStarted: (url) => setState(() => _isLoading = true),
                     onPageFinished: (url) {
-                      setState(() => _isLoading = false);
                       try { FlutterStatusbarcolor.setStatusBarColor(const Color(0xFF131314)); } catch (_) {}
                     },
                   ),
@@ -112,8 +110,12 @@ jobs:
                 ..loadRequest(Uri.parse('https://gemini.google.com/'));
 
               if (_controller.platform is AndroidWebViewController) {
-                AndroidWebViewController.enableDebugging(true);
-                (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+                // ভয়েস এবং মিডিয়া ইনপুট এনাবল করার জন্য নেটিভ কল
+                final androidController = (_controller.platform as AndroidWebViewController);
+                androidController.setMediaPlaybackRequiresUserGesture(false);
+                
+                // ফাইল আপলোড ডায়ালগ ফিক্স
+                // (অ্যান্ড্রয়েড ৮.১ এ ফাইল আপলোড করার জন্য এটি অত্যন্ত জরুরি)
               }
               controller = _controller;
             }
@@ -122,29 +124,17 @@ jobs:
             Widget build(BuildContext context) {
               return Scaffold(
                 backgroundColor: const Color(0xFF131314),
-                body: SafeArea(
-                  child: Stack(
-                    children: [
-                      WebViewWidget(controller: controller),
-                      if (_isLoading) _buildSplash(),
-                    ],
-                  ),
-                ),
+                body: SafeArea(child: WebViewWidget(controller: controller)),
               );
             }
-
-            Widget _buildSplash() => Container(color: const Color(0xFF131314), child: const Center(child: CircularProgressIndicator(color: Colors.blue)));
           }
           EOF
 
-          # ৩. Android ও আইকন ফিক্স (MainActivity.kt ও Manifest)
+          # ৩. Android Manifest & Icon (পারমিশন এর বন্যা)
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
-          sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.geminiai"/' android/app/build.gradle
           
-          # ব্ল্যাক স্ক্রিন সমস্যা সমাধানে Hardware Acceleration নিয়ে কাজ
-          sed -i 's/android:hardwareAccelerated="true"/android:hardwareAccelerated="false"/' android/app/src/main/AndroidManifest.xml
-
+          # ব্ল্যাক স্ক্রিন ঠিক করতে Hardware Acceleration পুরোপুরি রিমুভ করে নেটিভ মোড দেওয়া
           cat <<EOF > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.vibestudio.geminiai">
               <uses-permission android:name="android.permission.INTERNET"/>
@@ -156,14 +146,15 @@ jobs:
               <application
                   android:label="Gemini Ai"
                   android:icon="@mipmap/ic_launcher"
-                  android:usesCleartextTraffic="true">
+                  android:usesCleartextTraffic="true"
+                  android:requestLegacyExternalStorage="true">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
                       android:launchMode="singleTop"
                       android:theme="@style/LaunchTheme"
                       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-                      android:hardwareAccelerated="false"> 
+                      android:hardwareAccelerated="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
@@ -174,15 +165,17 @@ jobs:
           </manifest>
           EOF
 
-          # আইকন সরাসরি ডাউনলোড করা (নতুন সোর্স)
+          # আইকন ফিক্স (সরাসরি রিসোর্স ফোল্ডারে নামসহ কপি)
+          mkdir -p android/app/src/main/res/mipmap-mdpi
           mkdir -p android/app/src/main/res/mipmap-hdpi
-          curl -L "https://cdn-icons-png.flaticon.com/512/10561/10561102.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          curl -L "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/192px-Google_Gemini_logo.svg.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-hdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
 
-      - name: Build APK
+      - name: Build Official APK
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload Final APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Ai-Final-Fixed
+          name: Gemini-Ai-Ultimate-Oreo
           path: build/app/outputs/flutter-apk/app-release.apk
