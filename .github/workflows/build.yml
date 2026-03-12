@@ -1,4 +1,4 @@
-name: Build Gemini Official Clone
+name: Build Gemini Official Clone Fixed
 
 on:
   push:
@@ -23,12 +23,11 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.22.0' # এরর এড়াতে ফ্লাটার ভার্সন আপডেট করা হয়েছে
 
-      # ধাপ ১: প্রজেক্ট স্ট্রাকচার এবং অফিসিয়াল ইউআই কোড ইনজেক্ট করা
       - name: Inject Official UI and Fix Files
         run: |
-          # pubspec.yaml আপডেট (সব ডিপেন্ডেন্সি সহ)
+          # pubspec.yaml আপডেট (ভার্সন ফিক্সড)
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
           description: A professional Gemini clone for Android 8.1
@@ -40,8 +39,8 @@ jobs:
               sdk: flutter
             google_generative_ai: ^0.4.0
             flutter_markdown: ^0.7.1
-            google_fonts: ^6.2.1
-            image_picker: ^1.1.2
+            google_fonts: ^6.1.0
+            image_picker: ^1.1.0
             shimmer: ^3.0.0
           dev_dependencies:
             flutter_test:
@@ -51,7 +50,7 @@ jobs:
             uses-material-design: true
           EOF
 
-          # main.dart ফাইলে অফিসিয়াল ডিজাইন ইনজেক্ট করা
+          # main.dart ফাইলে প্রিমিয়াম জেমিনি ডিজাইন
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'dart:io';
@@ -141,7 +140,7 @@ jobs:
             Widget _buildWelcome() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Shimmer.fromColors(baseColor: const Color(0xFF4285F4), highlightColor: const Color(0xFF91B9F8), child: const Icon(Icons.auto_awesome, size: 80)),
               const SizedBox(height: 20),
-              Text("শুভ সকাল, শরিফুল", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              Text("শুভ সকাল, শরিফুল", style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
               const Text("আমি আজ আপনাকে কিভাবে সাহায্য করতে পারি?", style: TextStyle(color: Colors.grey)),
             ]));
 
@@ -153,10 +152,10 @@ jobs:
                 Flexible(child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isUser ? const Color(0xFF202124) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (msg['image'] != null) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(msg['image'], width: 200)),
-                  MarkdownBody(data: msg['text'] ?? "", styleSheet: MarkdownStyleSheet(p: const TextStyle(fontSize: 16, color: Colors.whitee))),
+                  MarkdownBody(data: msg['text'] ?? "", styleSheet: MarkdownStyleSheet(p: const TextStyle(fontSize: 16, color: Colors.white))),
                 ]))),
                 if (isUser) const SizedBox(width: 10),
-                if (isUser) const CircleAvatar(radius: 12, backgroundColor: Colors.blueGrey, child: Icon(Icons.person, size: 15)),
+                if (isUser) const CircleAvatar(radius: 12, backgroundColor: Colors.blueGrey, child: Icon(Icons.person, size: 15, color: Colors.white)),
               ]));
             }
 
@@ -174,10 +173,11 @@ jobs:
           }
           EOF
 
-          # অ্যান্ড্রয়েড ভার্সন ফিক্স (৮.১ এর জন্য)
+          # অ্যান্ড্রয়েড ভার্সন ও প্যাকেজ ফিক্স
           sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
+          sed -i 's/namespace .*/namespace "com.vibestudio.gemini"/' android/app/build.gradle
 
       - name: Build Optimized Release APK
         run: flutter build apk --release --no-tree-shake-icons
