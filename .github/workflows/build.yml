@@ -1,4 +1,4 @@
-name: Ultimate Fix and Build Gemini App
+name: Gemini App Oreo Fix Build
 
 on:
   push:
@@ -25,33 +25,32 @@ jobs:
         with:
           flutter-version: '3.19.0'
 
-      # ধাপ ১: অ্যান্ড্রয়েড কনফিগারেশন অটো-ফিক্স (৮.১ এর জন্য)
-      - name: Auto-Fix Android Files
+      # এই অংশটি আপনার রিপোজিটরির ফাইলগুলোকে ৮.১ এর উপযোগী করে বদলে দেবে
+      - name: Force Fix Android Configuration
         run: |
-          # Min SDK এবং Target SDK সেট করা
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+          # SDK Versions Fix
+          sed -i 's/compileSdkVersion .*/compileSdkVersion 33/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
           
-          # অ্যাপের নাম এবং প্যাকেজ আইডি নিশ্চিত করা
+          # namespace এবং applicationId হুবহু ম্যাচ করানো
+          sed -i 's/namespace .*/namespace "com.vibestudio.gemini"/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
           
-          # মাল্টিডেক্স এনাবল করা (বড় অ্যাপের ক্ষেত্রে ইন্সটল এরর কমাতে)
+          # MultiDex এনাবল করা (ইন্সটল এরর কমাতে)
           sed -i '/defaultConfig {/a \        multiDexEnabled true' android/app/build.gradle
 
-      # ধাপ ২: ডিপেন্ডেন্সি আপডেট
       - name: Get Dependencies
         run: flutter pub get
 
-      # ধাপ ৩: অপ্টিমাইজড রিলিজ বিল্ড (পুরনো ফোনের আর্কিটেকচার সহ)
       - name: Build Optimized Release APK
         run: |
           flutter build apk --release \
           --no-tree-shake-icons \
-          --target-platform android-arm,android-arm64,android-x64
+          --target-platform android-arm,android-arm64
 
-      # ধাপ ৪: এপিকে ফাইলটি রিপোজিটরিতে সেভ করা (যেন পাথ মিসিং না হয়)
       - name: Upload Gemini Fixed APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-App-Fixed
+          name: Gemini-Oreo-Ready
           path: build/app/outputs/flutter-apk/app-release.apk
