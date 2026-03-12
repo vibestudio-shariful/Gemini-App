@@ -1,4 +1,4 @@
-name: Build Gemini Ai Official v2
+name: Build Gemini Ai Official Final
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Inject v2 Embedding & Pro Features
+      - name: Clean & Inject Fix
         run: |
           # ১. pubspec.yaml আপডেট
           cat <<EOF > pubspec.yaml
@@ -44,7 +44,7 @@ jobs:
             uses-material-design: true
           EOF
 
-          # ২. main.dart (ভয়েস ও ফাইল হ্যান্ডলিং সহ)
+          # ২. main.dart (রিসেন্ট স্ক্রিন ও পারমিশন ফিক্স)
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
@@ -126,19 +126,26 @@ jobs:
             }
 
             Widget _buildSplash() => Container(color: const Color(0xFF131314), child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.auto_awesome, size: 80, color: Color(0xFF4285F4)), const SizedBox(height: 20), const Text("Gemini Ai", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)), const SizedBox(height: 30), const SizedBox(width: 150, child: LinearProgressIndicator(color: Color(0xFF4285F4)))])));
-
             Widget _buildOffline() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.wifi_off, size: 70), const SizedBox(height: 20), const Text("ইন্টারনেট নেই"), const SizedBox(height: 20), ElevatedButton(onPressed: () => controller.reload(), child: const Text("পুনরায় চেষ্টা করুন"))]));
           }
           EOF
 
-          # ৩. Android v2 Embedding Fix & Permissions
+          # ৩. Android Configuration Fix (v2 & Install fix)
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.geminiai"/' android/app/build.gradle
           
-          # Manifest পুরোপুরি ফ্রেশ করে v2 embedding সেট করা
+          # MainActivity class path ফিক্স (ইন্সটল সমস্যার প্রধান কারণ)
+          mkdir -p android/app/src/main/kotlin/com/vibestudio/geminiai
+          cat <<EOF > android/app/src/main/kotlin/com/vibestudio/geminiai/MainActivity.kt
+          package com.vibestudio.geminiai
+          import io.flutter.embedding.android.FlutterActivity
+          class MainActivity: FlutterActivity() {}
+          EOF
+
+          # Manifest আপডেট
           cat <<EOF > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.vibestudio.geminiai">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.RECORD_AUDIO"/>
               <uses-permission android:name="android.permission.CAMERA"/>
@@ -149,9 +156,6 @@ jobs:
                   android:name="\${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
-                  <meta-data
-                      android:name="flutterEmbedding"
-                      android:value="2" />
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
@@ -165,6 +169,9 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
               </application>
           </manifest>
           EOF
@@ -174,11 +181,11 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-hdpi
           curl -L "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/120px-Google_Gemini_logo.svg.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
 
-      - name: Build Ultimate v2 APK
+      - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Ai-Ultimate-v2
+          name: Gemini-Ai-Fixed-v2
           path: build/app/outputs/flutter-apk/app-release.apk
