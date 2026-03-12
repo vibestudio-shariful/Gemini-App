@@ -1,4 +1,4 @@
-name: Build Optimized Release APK
+name: Build Optimized Gemini AI APK
 
 on:
   push:
@@ -28,14 +28,13 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      # সাইজ কমানোর জন্য রিলিজ বিল্ড এবং অপ্রয়োজনীয় আইকন রিমুভ
-      - name: Build Minified Release APK
-        run: |
-          flutter build apk --release --split-per-abi --no-tree-shake-icons
+      # সাইজ কমানোর জন্য পারফেক্ট বিল্ড কমান্ড
+      - name: Build Optimized Release APK
+        run: flutter build apk --release --no-tree-shake-icons
 
-      # বিল্ড হওয়া এপিকে আপলোড করা (arm64-v8a সাধারণত লেটেস্ট ফোনে কাজ করে, v7a পুরনো ফোনে)
-      - name: Upload Optimized APK
+      # এখানে পাথটি ফিক্স করা হয়েছে যেন গিটহাব ফাইলটি খুঁজে পায়
+      - name: Upload Gemini Optimized APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-AI-Optimized
+          name: Gemini-AI-Release
           path: build/app/outputs/flutter-apk/app-release.apk
