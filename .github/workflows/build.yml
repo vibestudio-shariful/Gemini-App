@@ -1,4 +1,4 @@
-name: Build Gemini Ai Pro Ultimate
+name: Build Gemini Ai Official v2
 
 on:
   push:
@@ -25,12 +25,12 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Inject Pro Features & Permissions
+      - name: Inject v2 Embedding & Pro Features
         run: |
           # ১. pubspec.yaml আপডেট
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
-          description: A professional Gemini application with Voice and Upload
+          description: A professional Gemini application
           version: 1.0.0+1
           environment:
             sdk: '>=3.2.0 <4.0.0'
@@ -38,20 +38,17 @@ jobs:
             flutter:
               sdk: flutter
             webview_flutter: ^4.7.0
-            webview_flutter_android: ^3.15.0
             flutter_statusbarcolor_ns: ^0.6.0
-            path_provider: ^2.1.2
             permission_handler: ^11.3.1
           flutter:
             uses-material-design: true
           EOF
 
-          # ২. main.dart (ভয়েস, আপলোড এবং ডাউনলোড লজিক সহ)
+          # ২. main.dart (ভয়েস ও ফাইল হ্যান্ডলিং সহ)
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
           import 'package:webview_flutter/webview_flutter.dart';
-          import 'package:webview_flutter_android/webview_flutter_android.dart';
           import 'package:flutter_statusbarcolor_ns/flutter_statusbarcolor_ns.dart';
           import 'package:permission_handler/permission_handler.dart';
 
@@ -110,11 +107,6 @@ jobs:
                   ),
                 )
                 ..loadRequest(Uri.parse('https://gemini.google.com/'));
-
-              // ফাইল আপলোড এনাবল করা (Android specific)
-              if (controller.platform is AndroidWebViewController) {
-                (controller.platform as AndroidWebViewController).setTargetMessenger(null);
-              }
             }
 
             @override
@@ -139,13 +131,12 @@ jobs:
           }
           EOF
 
-          # ৩. পারমিশন এবং প্যাকেজ কনফিগারেশন (AndroidManifest ফিক্স)
+          # ৩. Android v2 Embedding Fix & Permissions
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.geminiai"/' android/app/build.gradle
-          sed -i 's/android:label=".*/android:label="Gemini Ai"/' android/app/src/main/AndroidManifest.xml
           
-          # ভয়েস এবং ফাইল আপলোড পারমিশন যোগ করা
+          # Manifest পুরোপুরি ফ্রেশ করে v2 embedding সেট করা
           cat <<EOF > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
@@ -158,6 +149,9 @@ jobs:
                   android:name="\${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
@@ -180,11 +174,11 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-hdpi
           curl -L "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/120px-Google_Gemini_logo.svg.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
 
-      - name: Build Ultimate APK
+      - name: Build Ultimate v2 APK
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Ai-Pro-Ultimate
+          name: Gemini-Ai-Ultimate-v2
           path: build/app/outputs/flutter-apk/app-release.apk
