@@ -1,4 +1,4 @@
-name: Sure-Fix and Build Gemini App
+name: Build Gemini Official Clone
 
 on:
   push:
@@ -25,40 +25,165 @@ jobs:
         with:
           flutter-version: '3.19.0'
 
-      # ধাপ ১: রিপোজিটরির হার্ডওয়্যার লেভেল ফিক্স (Sure Fix)
-      - name: Fix Repository Structure
+      # ধাপ ১: প্রজেক্ট স্ট্রাকচার এবং অফিসিয়াল ইউআই কোড ইনজেক্ট করা
+      - name: Inject Official UI and Fix Files
         run: |
-          # সব ক্যাশ ক্লিন করা
-          flutter clean
-          
-          # ১. অ্যান্ড্রয়েড বিল্ড ফাইলে সঠিক প্যাকেজ নাম বসানো
-          sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
-          sed -i 's/namespace .*/namespace "com.vibestudio.gemini"/' android/app/build.gradle
-          
-          # ২. অ্যান্ড্রয়েড ভার্সন ফিক্স (৮.১ এর জন্য পারফেক্ট)
+          # pubspec.yaml আপডেট (সব ডিপেন্ডেন্সি সহ)
+          cat <<EOF > pubspec.yaml
+          name: gemini_ai_pro
+          description: A professional Gemini clone for Android 8.1
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.2.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            google_generative_ai: ^0.4.0
+            flutter_markdown: ^0.7.1
+            google_fonts: ^6.2.1
+            image_picker: ^1.1.2
+            shimmer: ^3.0.0
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^3.0.0
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # main.dart ফাইলে অফিসিয়াল ডিজাইন ইনজেক্ট করা
+          mkdir -p lib
+          cat <<EOF > lib/main.dart
+          import 'dart:io';
+          import 'package:flutter/material.dart';
+          import 'package:google_generative_ai/google_generative_ai.dart';
+          import 'package:flutter_markdown/flutter_markdown.dart';
+          import 'package:google_fonts/google_fonts.dart';
+          import 'package:image_picker/image_picker.dart';
+          import 'package:shimmer/shimmer.dart';
+
+          void main() => runApp(const GeminiPro());
+
+          class GeminiPro extends StatelessWidget {
+            const GeminiPro({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  useMaterial3: true,
+                  brightness: Brightness.dark,
+                  scaffoldBackgroundColor: const Color(0xFF131314),
+                  colorSchemeSeed: const Color(0xFF4285F4),
+                  textTheme: GoogleFonts.notoSansBengaliTextTheme(ThemeData.dark().textTheme),
+                ),
+                home: const GeminiHome(),
+              );
+            }
+          }
+
+          class GeminiHome extends StatefulWidget {
+            const GeminiHome({super.key});
+            @override
+            State<GeminiHome> createState() => _GeminiHomeState();
+          }
+
+          class _GeminiHomeState extends State<GeminiHome> {
+            final String apiKey = "AIzaSyC6TBcU9Ur6kx4cmF_A5qxUb2R1JPqKo3Y";
+            late final GenerativeModel model;
+            late ChatSession chat;
+            final TextEditingController _controller = TextEditingController();
+            final List<Map<String, dynamic>> _messages = [];
+            bool _isLoading = false;
+            File? _image;
+
+            @override
+            void initState() {
+              super.initState();
+              model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
+              chat = model.startChat();
+            }
+
+            void _send() async {
+              if (_controller.text.isEmpty && _image == null) return;
+              final text = _controller.text;
+              final image = _image;
+              setState(() { _messages.add({"isUser": true, "text": text, "image": image}); _isLoading = true; _image = null; });
+              _controller.clear();
+              try {
+                final content = image != null 
+                    ? [Content.multi([TextPart(text), DataPart('image/jpeg', await image.readAsBytes())])]
+                    : [Content.text(text)];
+                final response = await chat.sendMessage(content.first);
+                setState(() { _messages.add({"isUser": false, "text": response.text}); _isLoading = false; });
+              } catch (e) { setState(() { _messages.add({"isUser": false, "text": "Error: \$e"}); _isLoading = false; }); }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text("Gemini", style: GoogleFonts.googleSans(fontWeight: FontWeight.bold, color: Colors.white70)),
+                  centerTitle: true, backgroundColor: const Color(0xFF131314), elevation: 0,
+                  leading: const Icon(Icons.menu, color: Colors.white70),
+                  actions: [IconButton(icon: const Icon(Icons.add, color: Colors.white70), onPressed: () => setState(() => _messages.clear()))],
+                ),
+                body: Column(
+                  children: [
+                    Expanded(child: _messages.isEmpty ? _buildWelcome() : ListView.builder(itemCount: _messages.length, itemBuilder: (context, i) => _buildBubble(_messages[i]))),
+                    if (_isLoading) _buildShimmer(),
+                    _buildInput(),
+                  ],
+                ),
+              );
+            }
+
+            Widget _buildWelcome() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Shimmer.fromColors(baseColor: const Color(0xFF4285F4), highlightColor: const Color(0xFF91B9F8), child: const Icon(Icons.auto_awesome, size: 80)),
+              const SizedBox(height: 20),
+              Text("শুভ সকাল, শরিফুল", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              const Text("আমি আজ আপনাকে কিভাবে সাহায্য করতে পারি?", style: TextStyle(color: Colors.grey)),
+            ]));
+
+            Widget _buildBubble(Map<String, dynamic> msg) {
+              bool isUser = msg['isUser'];
+              return Padding(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (!isUser) const Icon(Icons.auto_awesome, size: 20, color: Color(0xFF4285F4)),
+                const SizedBox(width: 10),
+                Flexible(child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isUser ? const Color(0xFF202124) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (msg['image'] != null) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(msg['image'], width: 200)),
+                  MarkdownBody(data: msg['text'] ?? "", styleSheet: MarkdownStyleSheet(p: const TextStyle(fontSize: 16, color: Colors.whitee))),
+                ]))),
+                if (isUser) const SizedBox(width: 10),
+                if (isUser) const CircleAvatar(radius: 12, backgroundColor: Colors.blueGrey, child: Icon(Icons.person, size: 15)),
+              ]));
+            }
+
+            Widget _buildShimmer() => Padding(padding: const EdgeInsets.all(15), child: Shimmer.fromColors(baseColor: const Color(0xFF202124), highlightColor: const Color(0xFF303134), child: Container(height: 20, width: double.infinity, color: Colors.white)));
+
+            Widget _buildInput() => Container(margin: const EdgeInsets.all(15), decoration: BoxDecoration(color: const Color(0xFF202124), borderRadius: BorderRadius.circular(30)),
+              child: Row(children: [
+                IconButton(icon: const Icon(Icons.add_photo_alternate_outlined, color: Color(0xFF8AB4F8)), onPressed: () async {
+                  final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+                  if (file != null) setState(() => _image = File(file.path));
+                }),
+                Expanded(child: TextField(controller: _controller, decoration: const InputDecoration(hintText: "Ask Gemini...", border: InputBorder.none))),
+                IconButton(icon: const Icon(Icons.send_rounded, color: Color(0xFF8AB4F8)), onPressed: _send),
+              ]));
+          }
+          EOF
+
+          # অ্যান্ড্রয়েড ভার্সন ফিক্স (৮.১ এর জন্য)
           sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
-          sed -i 's/compileSdkVersion .*/compileSdkVersion 33/' android/app/build.gradle
-          
-          # ৩. MainActivity এর পাথ ফিক্স (Kotlin ফাইলের ভেতরের প্যাকেজ নাম ঠিক করা)
-          find android/app/src/main/kotlin -name "MainActivity.kt" -exec sed -i 's/package .*/package com.vibestudio.gemini/' {} +
-          
-          # ৪. Manifest ফাইলে ক্র্যাশ ফিক্স (Internet ও মেমোরি পারমিশন)
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application android:usesCleartextTraffic="true" android:largeHeap="true"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
 
-      - name: Get Dependencies
-        run: flutter pub get
+      - name: Build Optimized Release APK
+        run: flutter build apk --release --no-tree-shake-icons
 
-      # ধাপ ২: অপ্টিমাইজড রিলিজ বিল্ড
-      - name: Build Final Stable APK
-        run: |
-          flutter build apk --release \
-          --no-tree-shake-icons \
-          --target-platform android-arm,android-arm64
-
-      - name: Upload Gemini App
+      - name: Upload Gemini Official Clone
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-Final
+          name: Gemini-Official-Look
           path: build/app/outputs/flutter-apk/app-release.apk
