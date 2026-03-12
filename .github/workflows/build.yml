@@ -1,4 +1,4 @@
-name: Gemini App Oreo Fix Build
+name: Sure-Fix and Build Gemini App
 
 on:
   push:
@@ -25,32 +25,40 @@ jobs:
         with:
           flutter-version: '3.19.0'
 
-      # এই অংশটি আপনার রিপোজিটরির ফাইলগুলোকে ৮.১ এর উপযোগী করে বদলে দেবে
-      - name: Force Fix Android Configuration
+      # ধাপ ১: রিপোজিটরির হার্ডওয়্যার লেভেল ফিক্স (Sure Fix)
+      - name: Fix Repository Structure
         run: |
-          # SDK Versions Fix
-          sed -i 's/compileSdkVersion .*/compileSdkVersion 33/' android/app/build.gradle
-          sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+          # সব ক্যাশ ক্লিন করা
+          flutter clean
           
-          # namespace এবং applicationId হুবহু ম্যাচ করানো
-          sed -i 's/namespace .*/namespace "com.vibestudio.gemini"/' android/app/build.gradle
+          # ১. অ্যান্ড্রয়েড বিল্ড ফাইলে সঠিক প্যাকেজ নাম বসানো
           sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
+          sed -i 's/namespace .*/namespace "com.vibestudio.gemini"/' android/app/build.gradle
           
-          # MultiDex এনাবল করা (ইন্সটল এরর কমাতে)
-          sed -i '/defaultConfig {/a \        multiDexEnabled true' android/app/build.gradle
+          # ২. অ্যান্ড্রয়েড ভার্সন ফিক্স (৮.১ এর জন্য পারফেক্ট)
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+          sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
+          sed -i 's/compileSdkVersion .*/compileSdkVersion 33/' android/app/build.gradle
+          
+          # ৩. MainActivity এর পাথ ফিক্স (Kotlin ফাইলের ভেতরের প্যাকেজ নাম ঠিক করা)
+          find android/app/src/main/kotlin -name "MainActivity.kt" -exec sed -i 's/package .*/package com.vibestudio.gemini/' {} +
+          
+          # ৪. Manifest ফাইলে ক্র্যাশ ফিক্স (Internet ও মেমোরি পারমিশন)
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:usesCleartextTraffic="true" android:largeHeap="true"/' android/app/src/main/AndroidManifest.xml
 
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build Optimized Release APK
+      # ধাপ ২: অপ্টিমাইজড রিলিজ বিল্ড
+      - name: Build Final Stable APK
         run: |
           flutter build apk --release \
           --no-tree-shake-icons \
           --target-platform android-arm,android-arm64
 
-      - name: Upload Gemini Fixed APK
+      - name: Upload Gemini App
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Oreo-Ready
+          name: Gemini-Pro-Final
           path: build/app/outputs/flutter-apk/app-release.apk
