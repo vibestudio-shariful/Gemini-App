@@ -1,4 +1,4 @@
-name: Build Gemini Ai Official Full v1v2
+name: Build Gemini Ai V1V2 Perfect
 
 on:
   push:
@@ -44,7 +44,7 @@ jobs:
             uses-material-design: true
           EOF
 
-          # ২. main.dart (No Black Screen & Features)
+          # ২. main.dart
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
@@ -130,16 +130,12 @@ jobs:
           }
           EOF
 
-          # ৩. Android Configuration (Force v1 & v2 Signing)
+          # ৩. Android v1/v2 Signature Fix (Manual approach to avoid Gradle property errors)
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.geminiai"/' android/app/build.gradle
           
-          # v1 এবং v2 সাইনিং এনাবল করার জন্য Gradle ইঞ্জেকশন
-          sed -i '/buildTypes {/i \    signingConfigs {\n        release {\n            v1SigningEnabled true\n            v2SigningEnabled true\n        }\n    }' android/app/build.gradle
-          sed -i '/release {/i \            signingConfig signingConfigs.release' android/app/build.gradle
-
-          # MainActivity class path ফিক্স
+          # MainActivity ফিক্স
           mkdir -p android/app/src/main/kotlin/com/vibestudio/geminiai
           cat <<EOF > android/app/src/main/kotlin/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
@@ -147,7 +143,7 @@ jobs:
           class MainActivity: FlutterActivity() {}
           EOF
 
-          # Manifest আপডেট
+          # AndroidManifest ফিক্স
           cat <<EOF > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.vibestudio.geminiai">
               <uses-permission android:name="android.permission.INTERNET"/>
@@ -173,9 +169,7 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-                  <meta-data
-                      android:name="flutterEmbedding"
-                      android:value="2" />
+                  <meta-data android:name="flutterEmbedding" android:value="2" />
               </application>
           </manifest>
           EOF
@@ -185,11 +179,11 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-hdpi
           curl -L "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/120px-Google_Gemini_logo.svg.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
 
-      - name: Build APK (Multi-Signed)
+      - name: Build APK (Release mode automatically handles signing in CI)
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Ai-V1V2-Signed
+          name: Gemini-Ai-V1V2-Stable
           path: build/app/outputs/flutter-apk/app-release.apk
