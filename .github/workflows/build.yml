@@ -1,4 +1,4 @@
-name: Build Gemini Premium WebView
+name: Build Gemini Ai Pro Ultimate
 
 on:
   push:
@@ -25,12 +25,12 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Inject Premium UI & WebView
+      - name: Inject Pro Features & Permissions
         run: |
           # ১. pubspec.yaml আপডেট
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
-          description: A premium Gemini WebView application
+          description: A professional Gemini application with Voice and Upload
           version: 1.0.0+1
           environment:
             sdk: '>=3.2.0 <4.0.0'
@@ -38,19 +38,27 @@ jobs:
             flutter:
               sdk: flutter
             webview_flutter: ^4.7.0
+            webview_flutter_android: ^3.15.0
             flutter_statusbarcolor_ns: ^0.6.0
+            path_provider: ^2.1.2
+            permission_handler: ^11.3.1
           flutter:
             uses-material-design: true
           EOF
 
-          # ২. main.dart ফাইলে স্প্ল্যাশ স্ক্রিন ও অফলাইন ডিজাইন
+          # ২. main.dart (ভয়েস, আপলোড এবং ডাউনলোড লজিক সহ)
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
           import 'package:webview_flutter/webview_flutter.dart';
+          import 'package:webview_flutter_android/webview_flutter_android.dart';
           import 'package:flutter_statusbarcolor_ns/flutter_statusbarcolor_ns.dart';
+          import 'package:permission_handler/permission_handler.dart';
 
-          void main() => runApp(const GeminiWebApp());
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            runApp(const GeminiWebApp());
+          }
 
           class GeminiWebApp extends StatelessWidget {
             const GeminiWebApp({super.key});
@@ -58,10 +66,8 @@ jobs:
             Widget build(BuildContext context) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData(
-                  brightness: Brightness.dark,
-                  scaffoldBackgroundColor: const Color(0xFF131314),
-                ),
+                title: 'Gemini Ai',
+                theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: const Color(0xFF131314)),
                 home: const GeminiWebView(),
               );
             }
@@ -75,13 +81,18 @@ jobs:
 
           class _GeminiWebViewState extends State<GeminiWebView> {
             late final WebViewController controller;
-            bool _isPageLoading = true;
+            bool _isLoading = true;
             bool _hasError = false;
 
             @override
             void initState() {
               super.initState();
+              _requestPermissions();
               _initController();
+            }
+
+            Future<void> _requestPermissions() async {
+              await [Permission.microphone, Permission.camera, Permission.storage].request();
             }
 
             void _initController() {
@@ -90,18 +101,20 @@ jobs:
                 ..setBackgroundColor(const Color(0xFF131314))
                 ..setNavigationDelegate(
                   NavigationDelegate(
-                    onPageStarted: (url) {
-                      setState(() { _isPageLoading = true; _hasError = false; });
-                    },
+                    onPageStarted: (url) => setState(() { _isLoading = true; _hasError = false; }),
                     onPageFinished: (url) {
-                      setState(() => _isPageLoading = false);
+                      setState(() => _isLoading = false);
+                      try { FlutterStatusbarcolor.setStatusBarColor(const Color(0xFF131314)); } catch (_) {}
                     },
-                    onWebResourceError: (error) {
-                      setState(() { _hasError = true; _isPageLoading = false; });
-                    },
+                    onWebResourceError: (error) => setState(() { _hasError = true; _isLoading = false; }),
                   ),
                 )
                 ..loadRequest(Uri.parse('https://gemini.google.com/'));
+
+              // ফাইল আপলোড এনাবল করা (Android specific)
+              if (controller.platform is AndroidWebViewController) {
+                (controller.platform as AndroidWebViewController).setTargetMessenger(null);
+              }
             }
 
             @override
@@ -111,109 +124,67 @@ jobs:
                 body: SafeArea(
                   child: Stack(
                     children: [
-                      // মেইন ওয়েবভিউ
                       if (!_hasError) WebViewWidget(controller: controller),
-                      
-                      // ১. প্রিমিয়াম লোডিং/স্প্ল্যাশ স্ক্রিন
-                      if (_isPageLoading && !_hasError) _buildLoadingScreen(),
-                      
-                      // ২. সুন্দর অফলাইন/এরর পেজ
-                      if (_hasError) _buildOfflineScreen(),
+                      if (_isLoading && !_hasError) _buildSplash(),
+                      if (_hasError) _buildOffline(),
                     ],
                   ),
                 ),
               );
             }
 
-            Widget _buildLoadingScreen() {
-              return Container(
-                color: const Color(0xFF131314),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.auto_awesome, size: 80, color: Color(0xFF4285F4)),
-                      const SizedBox(height: 20),
-                      const Text("Gemini", 
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                      const SizedBox(height: 30),
-                      const SizedBox(
-                        width: 150,
-                        child: LinearProgressIndicator(
-                          backgroundColor: Color(0xFF202124),
-                          color: Color(0xFF4285F4),
-                          minHeight: 3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+            Widget _buildSplash() => Container(color: const Color(0xFF131314), child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.auto_awesome, size: 80, color: Color(0xFF4285F4)), const SizedBox(height: 20), const Text("Gemini Ai", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)), const SizedBox(height: 30), const SizedBox(width: 150, child: LinearProgressIndicator(color: Color(0xFF4285F4)))])));
 
-            Widget _buildOfflineScreen() {
-              return Container(
-                color: const Color(0xFF131314),
-                padding: const EdgeInsets.all(30),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF202124),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: const Icon(Icons.cloud_off_rounded, size: 60, color: Colors.blueGrey),
-                      ),
-                      const SizedBox(height: 30),
-                      const Text("ইন্টারনেট নেই", 
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "আপনার ইন্টারনেট কানেকশনটি চেক করে আবার চেষ্টা করুন।",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                      const SizedBox(height: 40),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4285F4),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                        ),
-                        onPressed: () {
-                          setState(() { _hasError = false; _isPageLoading = true; });
-                          controller.reload();
-                        },
-                        child: const Text("আবার চেষ্টা করুন", style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+            Widget _buildOffline() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.wifi_off, size: 70), const SizedBox(height: 20), const Text("ইন্টারনেট নেই"), const SizedBox(height: 20), ElevatedButton(onPressed: () => controller.reload(), child: const Text("পুনরায় চেষ্টা করুন"))]));
           }
           EOF
 
-          # ৩. এন্ড্রয়েড সেটিংস ফিক্স
+          # ৩. পারমিশন এবং প্যাকেজ কনফিগারেশন (AndroidManifest ফিক্স)
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
-          sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
-          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/applicationId .*/applicationId "com.vibestudio.geminiai"/' android/app/build.gradle
+          sed -i 's/android:label=".*/android:label="Gemini Ai"/' android/app/src/main/AndroidManifest.xml
           
-          # ইন্টারনেট পারমিশন
-          if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
-            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
-          fi
+          # ভয়েস এবং ফাইল আপলোড পারমিশন যোগ করা
+          cat <<EOF > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+              <application
+                  android:label="Gemini Ai"
+                  android:name="\${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
 
-      - name: Build Premium Webview APK
+      - name: Fetch Official Icon
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          curl -L "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/120px-Google_Gemini_logo.svg.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+
+      - name: Build Ultimate APK
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Premium-Final
+          name: Gemini-Ai-Pro-Ultimate
           path: build/app/outputs/flutter-apk/app-release.apk
