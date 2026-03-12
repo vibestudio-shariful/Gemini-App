@@ -1,4 +1,4 @@
-name: Build Gemini WebView Final Fix
+name: Build Gemini WebView SDK Fix
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
 
       - name: Auto-Inject WebView Code & Fix
         run: |
-          # ১. pubspec.yaml আপডেট (ভার্সন ফিক্স করা হয়েছে)
+          # ১. pubspec.yaml আপডেট
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
           description: A professional Gemini WebView application
@@ -47,7 +47,7 @@ jobs:
             uses-material-design: true
           EOF
 
-          # ২. main.dart ফিক্সড কোড
+          # ২. main.dart কোড
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
@@ -63,12 +63,6 @@ jobs:
             const GeminiWebApp({super.key});
             @override
             Widget build(BuildContext context) {
-              // স্ট্যাটাস বার কালার ফিক্স
-              try {
-                FlutterStatusbarcolor.setStatusBarColor(const Color(0xFF131314));
-                FlutterStatusbarcolor.setStatusBarWhiteForeground(true);
-              } catch (e) {}
-              
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
@@ -98,7 +92,14 @@ jobs:
                 ..setBackgroundColor(const Color(0xFF131314))
                 ..setNavigationDelegate(
                   NavigationDelegate(
-                    onPageStarted: (String url) => setState(() => _isLoading = true),
+                    onPageStarted: (String url) {
+                      setState(() => _isLoading = true);
+                      // স্ট্যাটাস বার কালার সেট করা
+                      try {
+                        FlutterStatusbarcolor.setStatusBarColor(const Color(0xFF131314));
+                        FlutterStatusbarcolor.setStatusBarWhiteForeground(true);
+                      } catch (_) {}
+                    },
                     onPageFinished: (String url) => setState(() => _isLoading = false),
                   ),
                 )
@@ -123,8 +124,9 @@ jobs:
           }
           EOF
 
-          # ৩. অ্যান্ড্রয়েড ও গ্রেডল কনফিগারেশন
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+          # ৩. গুরুত্বপূর্ণ SDK ফিক্স (ওরিও ফোনের জন্য)
+          # minSdkVersion বাড়িয়ে ২৭ করা হলো যাতে স্ট্যাটাস বার প্যাকেজটি কাজ করে
+          sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
           
@@ -142,5 +144,5 @@ jobs:
       - name: Upload Gemini WebView APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-WebView-Pro
+          name: Gemini-WebView-Pro-Fixed
           path: build/app/outputs/flutter-apk/app-release.apk
