@@ -1,77 +1,63 @@
 import 'package:flutter/material.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-void main() => runApp(const GeminiApp());
+void main() => runApp(const GeminiWebApp());
 
-class GeminiApp extends StatelessWidget {
-  const GeminiApp({super.key});
+class GeminiWebApp extends StatelessWidget {
+  const GeminiWebApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: const ChatScreen(),
+      theme: ThemeData(brightness: Brightness.dark),
+      home: const GeminiWebView(),
     );
   }
 }
 
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+class GeminiWebView extends StatefulWidget {
+  const GeminiWebView({super.key});
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  State<GeminiWebView> createState() => _GeminiWebViewState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
-  final String apiKey = "AIzaSyC6TBcU9Ur6kx4cmF_A5qxUb2R1JPqKo3Y";
-  late final GenerativeModel model;
-  late final ChatSession chat;
-  final TextEditingController _controller = TextEditingController();
-  final List<Content> _history = [];
-  bool _loading = false;
+class _GeminiWebViewState extends State<GeminiWebView> {
+  late final WebViewController controller;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
-    chat = model.startChat();
-  }
-
-  void _send() async {
-    if (_controller.text.isEmpty) return;
-    final text = _controller.text;
-    setState(() { _history.add(Content.text(text)); _loading = true; });
-    _controller.clear();
-    final response = await chat.sendMessage(Content.text(text));
-    setState(() {
-      _history.add(Content.model([TextPart(response.text ?? "Error")]));
-      _loading = false;
-    });
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF131314))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) => setState(() => _isLoading = true),
+          onPageFinished: (String url) => setState(() => _isLoading = false),
+        ),
+      )
+      ..loadRequest(Uri.parse('https://gemini.google.com/'));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Gemini AI Pro")),
-      body: Column(
+      // নিচের AppBar টি আপনি চাইলে সরিয়ে দিতে পারেন একদম ফুল স্ক্রিন ফিল পেতে
+      appBar: AppBar(
+        title: const Text("Gemini AI", style: TextStyle(fontSize: 16)),
+        backgroundColor: const Color(0xFF131314),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => controller.reload()),
+        ],
+      ),
+      body: Stack(
         children: [
-          Expanded(child: ListView.builder(
-            itemCount: _history.length,
-            itemBuilder: (context, i) => Padding(
-              padding: const EdgeInsets.all(12),
-              child: MarkdownBody(data: _history[i].parts.whereType<TextPart>().map((e)=>e.text).join()),
+          WebViewWidget(controller: controller),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Colors.blue),
             ),
-          )),
-          if (_loading) const LinearProgressIndicator(),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(child: TextField(controller: _controller, decoration: const InputDecoration(hintText: "Ask Gemini..."))),
-                IconButton(icon: const Icon(Icons.send), onPressed: _send),
-              ],
-            ),
-          ),
         ],
       ),
     );
