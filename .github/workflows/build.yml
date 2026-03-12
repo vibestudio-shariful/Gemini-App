@@ -1,4 +1,4 @@
-name: Build Gemini Ai Official Final
+name: Build Gemini Ai Official Full v1v2
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
 
       - name: Clean & Inject Fix
         run: |
-          # ১. pubspec.yaml আপডেট
+          # ১. pubspec.yaml
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
           description: A professional Gemini application
@@ -44,7 +44,7 @@ jobs:
             uses-material-design: true
           EOF
 
-          # ২. main.dart (রিসেন্ট স্ক্রিন ও পারমিশন ফিক্স)
+          # ২. main.dart (No Black Screen & Features)
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
@@ -130,12 +130,16 @@ jobs:
           }
           EOF
 
-          # ৩. Android Configuration Fix (v2 & Install fix)
+          # ৩. Android Configuration (Force v1 & v2 Signing)
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.geminiai"/' android/app/build.gradle
           
-          # MainActivity class path ফিক্স (ইন্সটল সমস্যার প্রধান কারণ)
+          # v1 এবং v2 সাইনিং এনাবল করার জন্য Gradle ইঞ্জেকশন
+          sed -i '/buildTypes {/i \    signingConfigs {\n        release {\n            v1SigningEnabled true\n            v2SigningEnabled true\n        }\n    }' android/app/build.gradle
+          sed -i '/release {/i \            signingConfig signingConfigs.release' android/app/build.gradle
+
+          # MainActivity class path ফিক্স
           mkdir -p android/app/src/main/kotlin/com/vibestudio/geminiai
           cat <<EOF > android/app/src/main/kotlin/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
@@ -181,11 +185,11 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-hdpi
           curl -L "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/120px-Google_Gemini_logo.svg.png" -o android/app/src/main/res/mipmap-hdpi/ic_launcher.png
 
-      - name: Build APK
+      - name: Build APK (Multi-Signed)
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Ai-Fixed-v2
+          name: Gemini-Ai-V1V2-Signed
           path: build/app/outputs/flutter-apk/app-release.apk
