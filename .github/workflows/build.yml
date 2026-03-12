@@ -1,4 +1,4 @@
-name: Build Gemini WebView SDK Fix
+name: Build Gemini Premium WebView
 
 on:
   push:
@@ -25,12 +25,12 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Auto-Inject WebView Code & Fix
+      - name: Inject Premium UI & WebView
         run: |
           # ১. pubspec.yaml আপডেট
           cat <<EOF > pubspec.yaml
           name: gemini_ai_pro
-          description: A professional Gemini WebView application
+          description: A premium Gemini WebView application
           version: 1.0.0+1
           environment:
             sdk: '>=3.2.0 <4.0.0'
@@ -39,25 +39,18 @@ jobs:
               sdk: flutter
             webview_flutter: ^4.7.0
             flutter_statusbarcolor_ns: ^0.6.0
-          dev_dependencies:
-            flutter_test:
-              sdk: flutter
-            flutter_lints: ^3.0.0
           flutter:
             uses-material-design: true
           EOF
 
-          # ২. main.dart কোড
+          # ২. main.dart ফাইলে স্প্ল্যাশ স্ক্রিন ও অফলাইন ডিজাইন
           mkdir -p lib
           cat <<EOF > lib/main.dart
           import 'package:flutter/material.dart';
           import 'package:webview_flutter/webview_flutter.dart';
           import 'package:flutter_statusbarcolor_ns/flutter_statusbarcolor_ns.dart';
 
-          void main() {
-            WidgetsFlutterBinding.ensureInitialized();
-            runApp(const GeminiWebApp());
-          }
+          void main() => runApp(const GeminiWebApp());
 
           class GeminiWebApp extends StatelessWidget {
             const GeminiWebApp({super.key});
@@ -82,25 +75,30 @@ jobs:
 
           class _GeminiWebViewState extends State<GeminiWebView> {
             late final WebViewController controller;
-            bool _isLoading = true;
+            bool _isPageLoading = true;
+            bool _hasError = false;
 
             @override
             void initState() {
               super.initState();
+              _initController();
+            }
+
+            void _initController() {
               controller = WebViewController()
                 ..setJavaScriptMode(JavaScriptMode.unrestricted)
                 ..setBackgroundColor(const Color(0xFF131314))
                 ..setNavigationDelegate(
                   NavigationDelegate(
-                    onPageStarted: (String url) {
-                      setState(() => _isLoading = true);
-                      // স্ট্যাটাস বার কালার সেট করা
-                      try {
-                        FlutterStatusbarcolor.setStatusBarColor(const Color(0xFF131314));
-                        FlutterStatusbarcolor.setStatusBarWhiteForeground(true);
-                      } catch (_) {}
+                    onPageStarted: (url) {
+                      setState(() { _isPageLoading = true; _hasError = false; });
                     },
-                    onPageFinished: (String url) => setState(() => _isLoading = false),
+                    onPageFinished: (url) {
+                      setState(() => _isPageLoading = false);
+                    },
+                    onWebResourceError: (error) {
+                      setState(() { _hasError = true; _isPageLoading = false; });
+                    },
                   ),
                 )
                 ..loadRequest(Uri.parse('https://gemini.google.com/'));
@@ -113,9 +111,85 @@ jobs:
                 body: SafeArea(
                   child: Stack(
                     children: [
-                      WebViewWidget(controller: controller),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator(color: Colors.blue)),
+                      // মেইন ওয়েবভিউ
+                      if (!_hasError) WebViewWidget(controller: controller),
+                      
+                      // ১. প্রিমিয়াম লোডিং/স্প্ল্যাশ স্ক্রিন
+                      if (_isPageLoading && !_hasError) _buildLoadingScreen(),
+                      
+                      // ২. সুন্দর অফলাইন/এরর পেজ
+                      if (_hasError) _buildOfflineScreen(),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildLoadingScreen() {
+              return Container(
+                color: const Color(0xFF131314),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.auto_awesome, size: 80, color: Color(0xFF4285F4)),
+                      const SizedBox(height: 20),
+                      const Text("Gemini", 
+                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                      const SizedBox(height: 30),
+                      const SizedBox(
+                        width: 150,
+                        child: LinearProgressIndicator(
+                          backgroundColor: Color(0xFF202124),
+                          color: Color(0xFF4285F4),
+                          minHeight: 3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildOfflineScreen() {
+              return Container(
+                color: const Color(0xFF131314),
+                padding: const EdgeInsets.all(30),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF202124),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: const Icon(Icons.cloud_off_rounded, size: 60, color: Colors.blueGrey),
+                      ),
+                      const SizedBox(height: 30),
+                      const Text("ইন্টারনেট নেই", 
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      const Text(
+                        "আপনার ইন্টারনেট কানেকশনটি চেক করে আবার চেষ্টা করুন।",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                      const SizedBox(height: 40),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4285F4),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        ),
+                        onPressed: () {
+                          setState(() { _hasError = false; _isPageLoading = true; });
+                          controller.reload();
+                        },
+                        child: const Text("আবার চেষ্টা করুন", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                     ],
                   ),
                 ),
@@ -124,25 +198,22 @@ jobs:
           }
           EOF
 
-          # ৩. গুরুত্বপূর্ণ SDK ফিক্স (ওরিও ফোনের জন্য)
-          # minSdkVersion বাড়িয়ে ২৭ করা হলো যাতে স্ট্যাটাস বার প্যাকেজটি কাজ করে
+          # ৩. এন্ড্রয়েড সেটিংস ফিক্স
           sed -i 's/minSdkVersion .*/minSdkVersion 27/' android/app/build.gradle
           sed -i 's/targetSdkVersion .*/targetSdkVersion 33/' android/app/build.gradle
           sed -i 's/applicationId .*/applicationId "com.vibestudio.gemini"/' android/app/build.gradle
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
           
           # ইন্টারনেট পারমিশন
           if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
             sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
           fi
-          
-          # গ্রেডল ডিস্ট্রিবিউশন ফিক্স
-          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.1-all.zip|' android/gradle/wrapper/gradle-wrapper.properties
 
-      - name: Build Final WebView APK
+      - name: Build Premium Webview APK
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload Gemini WebView APK
+      - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-WebView-Pro-Fixed
+          name: Gemini-Premium-Final
           path: build/app/outputs/flutter-apk/app-release.apk
