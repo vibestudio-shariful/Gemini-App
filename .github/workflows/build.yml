@@ -1,4 +1,4 @@
-name: Build Gemini Pro Final Fix
+name: Build Gemini Pro Ultimate Fixed
 
 on:
   push:
@@ -39,7 +39,8 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p app/src/main/res/mipmap-\$res; done
+          # Fixed Loop for Directories
+          for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p "app/src/main/res/mipmap-$res"; done
 
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
@@ -53,7 +54,7 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              aaptOptions { cruncherEnabled = false; useNewCruncher = false }
+              buildTypes { release { minifyEnabled false } }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = '17' }
           }
@@ -63,7 +64,7 @@ jobs:
           }
           EOF
 
-          # MainActivity.kt (Dynamic Status Bar & Fixed Permissions)
+          # MainActivity.kt (Adaptive UI & Anti-Zoom)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -87,7 +88,7 @@ jobs:
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
                   
-                  // Make status bar clean
+                  // Perfect Status Bar for Oreo and Above
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                       window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
                       window.statusBarColor = Color.parseColor("#131314")
@@ -108,7 +109,6 @@ jobs:
                       mediaPlaybackRequiresUserGesture = false
                       allowFileAccess = true
                       setSupportZoom(false)
-                      builtInZoomControls = false
                       useWideViewPort = true
                       loadWithOverviewMode = true
                       userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -116,7 +116,7 @@ jobs:
 
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
-                          // Meta tag injection to prevent zoom
+                          // No-Zoom Script
                           view?.loadUrl("javascript:(function() { " +
                                   "var meta = document.createElement('meta');" +
                                   "meta.name = 'viewport';" +
@@ -160,7 +160,7 @@ jobs:
           }
           EOF
 
-          # UI Design with Pulse Loader
+          # UI Design with Sleek Loading Animation
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
@@ -171,14 +171,14 @@ jobs:
                   android:gravity="center" android:orientation="vertical" android:background="#131314">
                   
                   <ImageView android:id="@+id/splash_logo" android:layout_width="100dp" android:layout_height="100dp" 
-                      android:src="@mipmap/ic_launcher" android:layout_marginBottom="40dp"/>
+                      android:src="@mipmap/ic_launcher" android:layout_marginBottom="50dp"/>
                   
-                  <ProgressBar android:layout_width="50dp" android:layout_height="50dp"
-                      android:indeterminateTint="#4285F4" android:indeterminate="true"/>
+                  <ProgressBar android:layout_width="45dp" android:layout_height="45dp"
+                      android:indeterminateTint="#4285F4" style="@android:style/Widget.Material.ProgressBar"/>
                   
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
-                      android:text="Initializing Gemini Pro" android:textColor="#606060" android:textSize="14sp"
-                      android:layout_marginTop="20dp" android:letterSpacing="0.1"/>
+                      android:text="Initializing..." android:textColor="#808080" android:textSize="14sp"
+                      android:layout_marginTop="25dp" android:letterSpacing="0.2"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
@@ -189,11 +189,11 @@ jobs:
           </style></resources>
           EOF
           
-          # অফিসিয়াল জেমিনি লোগো ও আইকন ফিক্স
+          # Gemini Logo Fix
           curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o logo.png
           for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            cp logo.png app/src/main/res/mipmap-\$res/ic_launcher.png
-            cp logo.png app/src/main/res/mipmap-\$res/ic_launcher_round.png
+            cp logo.png "app/src/main/res/mipmap-$res/ic_launcher.png"
+            cp logo.png "app/src/main/res/mipmap-$res/ic_launcher_round.png"
           done
           
           cat <<EOF > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
@@ -223,5 +223,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-Final-Fixed
+          name: Gemini-Pro-Build
           path: app/build/outputs/apk/release/app-release-unsigned.apk
