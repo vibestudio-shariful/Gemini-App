@@ -1,4 +1,4 @@
-name: Build Gemini Ai Native Kotlin
+name: Build Gemini Ai Native Fixed
 
 on:
   push:
@@ -16,16 +16,19 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Create Native Android Project
+      - name: Initialize Android Project
         run: |
-          # ১. প্রজেক্টের ফোল্ডার স্ট্রাকচার তৈরি
+          # ১. সব ফোল্ডার তৈরি
           mkdir -p app/src/main/java/com/vibestudio/geminiai
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
+          mkdir -p gradle/wrapper
 
-          # ২. build.gradle (Native Configuration)
+          # ২. Gradle Wrapper জেনারেট করা
+          gradle wrapper --gradle-version 8.1.1
+
+          # ৩. Root build.gradle
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
@@ -34,8 +37,14 @@ jobs:
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
+          # ৪. settings.gradle
+          echo "include ':app'" > settings.gradle
+
+          # ৫. app/build.gradle
           cat <<EOF > app/build.gradle
-          plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+          plugins {
+              id 'com.android.application'
+          }
           android {
               namespace 'com.vibestudio.geminiai'
               compileSdk 33
@@ -46,17 +55,19 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              buildTypes { release { minifyEnabled false } }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
           }
           dependencies {
-              implementation "androidx.core:core-ktx:1.10.1"
               implementation "androidx.appcompat:appcompat:1.6.1"
               implementation "com.google.android.material:material:1.9.0"
-              implementation "androidx.webkit:webkit:1.7.0"
           }
           EOF
 
-          # ৩. MainActivity.kt (নেটিভ ওয়েবভিউ এবং পারমিশন হ্যান্ডলার)
+          # ৬. MainActivity.kt (নেটিভ ওয়েবভিউ এবং ফুল স্ক্রিন)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
 
@@ -67,18 +78,15 @@ jobs:
           import androidx.core.app.ActivityCompat
 
           class MainActivity : AppCompatActivity() {
-              private lateinit var webView: WebView
-
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  webView = WebView(this)
+                  val webView = WebView(this)
                   setContentView(webView)
 
-                  // পারমিশন রিকোয়েস্ট
+                  // পারমিশন রিকোয়েস্ট (ভয়েস ও ক্যামেরার জন্য)
                   ActivityCompat.requestPermissions(this, arrayOf(
                       Manifest.permission.RECORD_AUDIO, 
-                      Manifest.permission.CAMERA,
-                      Manifest.permission.WRITE_EXTERNAL_STORAGE
+                      Manifest.permission.CAMERA
                   ), 1)
 
                   webView.settings.apply {
@@ -86,16 +94,11 @@ jobs:
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
                       allowFileAccess = true
+                      setSupportMultipleWindows(true)
                   }
 
                   webView.webViewClient = WebViewClient()
                   webView.webChromeClient = object : WebChromeClient() {
-                      // ফাইল আপলোড হ্যান্ডলার (Native Support)
-                      override fun onShowFileChooser(w: WebView?, f: ValueCallback<Array<android.net.Uri>>?, c: FileChooserParams?): Boolean {
-                          return true // এখানে ফাইল ওপেন করার নেটিভ কোড যুক্ত করা হয়েছে
-                      }
-                      
-                      // ভয়েস ইনপুট পারমিশন
                       override fun onPermissionRequest(request: PermissionRequest) {
                           request.grant(request.resources)
                       }
@@ -106,7 +109,7 @@ jobs:
           }
           EOF
 
-          # ৪. AndroidManifest.xml (Native Permissions)
+          # ৭. AndroidManifest.xml
           cat <<EOF > app/src/main/res/values/themes.xml
           <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar"/></resources>
           EOF
@@ -118,7 +121,8 @@ jobs:
               <uses-permission android:name="android.permission.CAMERA"/>
               <application
                   android:label="Gemini Ai"
-                  android:theme="@style/Theme.GeminiAi">
+                  android:theme="@style/Theme.GeminiAi"
+                  android:hardwareAccelerated="true">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -137,5 +141,5 @@ jobs:
       - name: Upload Native APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Native-Kotlin
+          name: Gemini-Native-Kotlin-Final
           path: app/build/outputs/apk/release/app-release-unsigned.apk
