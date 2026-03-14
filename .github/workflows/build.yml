@@ -1,4 +1,4 @@
-name: Build Gemini Ai Modern
+name: Build Gemini Ai Modern Pro
 
 on:
   push:
@@ -19,12 +19,10 @@ jobs:
 
       - name: Create Native Project Structure
         run: |
-          # ১. সেটিংস ও অ্যান্ড্রয়েড প্রপার্টিজ (সবচাইতে জরুরি)
           echo "include ':app'" > settings.gradle
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
 
-          # ২. রুট build.gradle
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
@@ -36,18 +34,14 @@ jobs:
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
-          # ৩. ডিরেক্টরি তৈরি
           mkdir -p app/src/main/java/com/vibestudio/geminiai
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-xxxhdpi
+          mkdir -p app/src/main/res/drawable
 
-          # ৪. app/build.gradle
           cat <<EOF > app/build.gradle
-          plugins {
-              id 'com.android.application'
-              id 'org.jetbrains.kotlin.android'
-          }
+          plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
           android {
               namespace 'com.vibestudio.geminiai'
               compileSdk 34
@@ -58,11 +52,8 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              buildTypes { release { minifyEnabled false } }
-              compileOptions { 
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17 
-              }
+              aaptOptions { cruncherEnabled = false; useNewCruncher = false }
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = '17' }
           }
           dependencies {
@@ -71,7 +62,7 @@ jobs:
           }
           EOF
 
-          # ৫. MainActivity.kt (Splash, Voice & File Upload handling)
+          # MainActivity.kt (Voice, File & Offline Handling)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -94,6 +85,7 @@ jobs:
                   
                   webView = findViewById(R.id.webView)
                   val splash = findViewById<View>(R.id.custom_splash)
+                  val offline = findViewById<View>(R.id.offline_screen)
 
                   ActivityCompat.requestPermissions(this, arrayOf(
                       Manifest.permission.RECORD_AUDIO, 
@@ -106,7 +98,6 @@ jobs:
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
                       allowFileAccess = true
-                      allowContentAccess = true
                   }
 
                   webView.webViewClient = object : WebViewClient() {
@@ -116,6 +107,10 @@ jobs:
                               webView.visibility = View.VISIBLE
                           }
                       }
+                      override fun onReceivedError(view: WebView?, r: WebResourceRequest?, e: WebResourceError?) {
+                          webView.visibility = View.GONE
+                          offline.visibility = View.VISIBLE
+                      }
                   }
                   
                   webView.webChromeClient = object : WebChromeClient() {
@@ -124,18 +119,18 @@ jobs:
                       }
                       override fun onShowFileChooser(w: WebView?, f: ValueCallback<Array<Uri>>?, c: FileChooserParams?): Boolean {
                           fileCallback = f
-                          try {
-                              val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                                  addCategory(Intent.CATEGORY_OPENABLE)
-                                  type = "*/*"
-                              }
-                              startActivityForResult(Intent.createChooser(intent, "Select File"), 100)
-                          } catch (e: Exception) {
-                              fileCallback = null
-                              return false
+                          val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                              addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
                           }
+                          startActivityForResult(Intent.createChooser(intent, "Select File"), 100)
                           return true
                       }
+                  }
+
+                  findViewById<Button>(R.id.retry_btn).setOnClickListener {
+                      offline.visibility = View.GONE
+                      splash.visibility = View.VISIBLE
+                      webView.reload()
                   }
                   webView.loadUrl("https://gemini.google.com/")
               }
@@ -148,21 +143,28 @@ jobs:
                       fileCallback = null
                   }
               }
-              override fun onBackPressed() { if(webView.canGoBack()) webBack() else super.onBackPressed() }
-              private fun webBack() { webView.goBack() }
+              override fun onBackPressed() { if(webView.canGoBack()) webView.goBack() else super.onBackPressed() }
           }
           EOF
 
-          # ৬. UI Design with Modern Fading Splash
+          # UI Design: Modern Splash & Offline (With Logo)
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
+              
               <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent"
                   android:gravity="center" android:orientation="vertical" android:background="#131314">
-                  <ImageView android:id="@+id/splash_logo" android:layout_width="100dp" android:layout_height="100dp" android:src="@mipmap/ic_launcher"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini Ai" android:textColor="#FFFFFF" android:textSize="28sp" android:textStyle="bold" android:layout_marginTop="20dp"/>
+                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@mipmap/ic_launcher"/>
                   <ProgressBar android:layout_width="35dp" android:layout_height="35dp" android:layout_marginTop="30dp" android:indeterminateTint="#4285F4"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="24sp" android:layout_marginTop="15dp"/>
+              </LinearLayout>
+
+              <LinearLayout android:id="@+id/offline_screen" android:layout_width="match_parent" android:layout_height="match_parent"
+                  android:gravity="center" android:orientation="vertical" android:visibility="gone" android:background="#131314">
+                  <ImageView android:layout_width="80dp" android:layout_height="80dp" android:src="@mipmap/ic_launcher" android:alpha="0.5"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Connection" android:textColor="#FFFFFF" android:layout_marginTop="20dp"/>
+                  <Button android:id="@+id/retry_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="15dp"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
@@ -172,7 +174,7 @@ jobs:
           <item name="android:statusBarColor">#131314</item></style></resources>
           EOF
           
-          # অফিসিয়াল আইকন ডাউনলোড
+          # Gemini Logo
           curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
 
@@ -194,7 +196,7 @@ jobs:
           ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK
-          uses: actions/upload-artifact@v4
-          with:
-            name: Gemini-Modern-Fixed
-            path: app/build/outputs/apk/release/app-release-unsigned.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gemini-Modern-Fixed
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
