@@ -1,4 +1,4 @@
-name: Build Gemini Ai Modern Pro
+name: Build Gemini Ai Premium Pro
 
 on:
   push:
@@ -59,10 +59,11 @@ jobs:
           dependencies {
               implementation "androidx.appcompat:appcompat:1.6.1"
               implementation "com.google.android.material:material:1.9.0"
+              implementation "androidx.cardview:cardview:1.0.0"
           }
           EOF
 
-          # MainActivity.kt (Voice, File & Offline Handling)
+          # MainActivity.kt (Strong Voice & Custom UI Logic)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -90,6 +91,7 @@ jobs:
                   ActivityCompat.requestPermissions(this, arrayOf(
                       Manifest.permission.RECORD_AUDIO, 
                       Manifest.permission.CAMERA,
+                      Manifest.permission.MODIFY_AUDIO_SETTINGS,
                       Manifest.permission.READ_EXTERNAL_STORAGE
                   ), 1)
 
@@ -98,31 +100,33 @@ jobs:
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
                       allowFileAccess = true
+                      databaseEnabled = true
                   }
 
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
-                          splash.animate().alpha(0f).setDuration(800).withEndAction {
+                          splash.animate().alpha(0f).setDuration(1000).withEndAction {
                               splash.visibility = View.GONE
                               webView.visibility = View.VISIBLE
                           }
                       }
-                      override fun onReceivedError(view: WebView?, r: WebResourceRequest?, e: WebResourceError?) {
+                      override fun onReceivedError(v: WebView?, r: WebResourceRequest?, e: WebResourceError?) {
                           webView.visibility = View.GONE
                           offline.visibility = View.VISIBLE
                       }
                   }
                   
                   webView.webChromeClient = object : WebChromeClient() {
+                      // এটিই ভয়েস বাটন সচল করার আসল কোড
                       override fun onPermissionRequest(request: PermissionRequest) {
-                          request.grant(request.resources)
+                          runOnUiThread { request.grant(request.resources) }
                       }
                       override fun onShowFileChooser(w: WebView?, f: ValueCallback<Array<Uri>>?, c: FileChooserParams?): Boolean {
                           fileCallback = f
                           val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                               addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
                           }
-                          startActivityForResult(Intent.createChooser(intent, "Select File"), 100)
+                          startActivityForResult(Intent.createChooser(intent, "Upload"), 100)
                           return true
                       }
                   }
@@ -147,31 +151,49 @@ jobs:
           }
           EOF
 
-          # UI Design: Modern Splash & Offline (With Logo)
+          # UI Design: Premium Splash & Modern Offline
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A0A">
+              
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
               
               <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent"
-                  android:gravity="center" android:orientation="vertical" android:background="#131314">
-                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@mipmap/ic_launcher"/>
-                  <ProgressBar android:layout_width="35dp" android:layout_height="35dp" android:layout_marginTop="30dp" android:indeterminateTint="#4285F4"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="24sp" android:layout_marginTop="15dp"/>
+                  android:gravity="center" android:orientation="vertical" android:background="@drawable/gradient_bg">
+                  <androidx.cardview.widget.CardView
+                      android:layout_width="120dp" android:layout_height="120dp"
+                      app:cardCornerRadius="60dp" app:cardElevation="20dp" app:cardBackgroundColor="#1E1E1E">
+                      <ImageView android:layout_width="match_parent" android:layout_height="match_parent" 
+                          android:src="@mipmap/ic_launcher" android:padding="20dp" android:scaleType="centerInside"/>
+                  </androidx.cardview.widget.CardView>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                      android:text="Gemini Pro" android:textColor="#FFFFFF" android:textSize="28sp" 
+                      android:textStyle="bold" android:layout_marginTop="25dp" android:letterSpacing="0.1"/>
+                  <ProgressBar android:layout_width="40dp" android:layout_height="40dp" android:layout_marginTop="40dp" android:indeterminateTint="#8AB4F8"/>
               </LinearLayout>
 
               <LinearLayout android:id="@+id/offline_screen" android:layout_width="match_parent" android:layout_height="match_parent"
-                  android:gravity="center" android:orientation="vertical" android:visibility="gone" android:background="#131314">
-                  <ImageView android:layout_width="80dp" android:layout_height="80dp" android:src="@mipmap/ic_launcher" android:alpha="0.5"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Connection" android:textColor="#FFFFFF" android:layout_marginTop="20dp"/>
-                  <Button android:id="@+id/retry_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="15dp"/>
+                  android:gravity="center" android:orientation="vertical" android:visibility="gone" android:background="#0A0A0A">
+                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@mipmap/ic_launcher" android:alpha="0.3"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                      android:text="ইন্টারনেট সংযোগ নেই" android:textColor="#808080" android:textSize="18sp" android:layout_marginTop="30dp"/>
+                  <Button android:id="@+id/retry_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                      android:text="আবার চেষ্টা করুন" android:backgroundTint="#8AB4F8" android:textColor="#000000" android:layout_marginTop="20dp" android:padding="12dp"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
 
+          # ব্যাকগ্রাউন্ড গ্রেডিয়েন্ট
+          cat <<EOF > app/src/main/res/drawable/gradient_bg.xml
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient android:startColor="#1a1c1e" android:endColor="#0A0A0A" android:angle="135"/>
+          </shape>
+          EOF
+
           cat <<EOF > app/src/main/res/values/themes.xml
           <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-          <item name="android:statusBarColor">#131314</item></style></resources>
+          <item name="android:statusBarColor">#1a1c1e</item></style></resources>
           EOF
           
           # Gemini Logo
@@ -180,7 +202,7 @@ jobs:
 
           cat <<EOF > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
               <application android:label="Gemini" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
                   <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize" android:screenOrientation="portrait">
                       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
@@ -198,5 +220,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Modern-Fixed
+          name: Gemini-Pro-Ultimate
           path: app/build/outputs/apk/release/app-release-unsigned.apk
