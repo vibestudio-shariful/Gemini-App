@@ -1,4 +1,4 @@
-name: Build Gemini Ai Native Fixed
+name: Build Gemini Ai Native Final Check
 
 on:
   push:
@@ -19,33 +19,35 @@ jobs:
 
       - name: Create Native Project Structure
         run: |
-          # ১. সেটিংস ও রুট গ্রেডল
+          # ১. সেটিংস
           echo "include ':app'" > settings.gradle
+
+          # ২. রুট build.gradle (Updated Versions)
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { 
-                  classpath "com.android.tools.build:gradle:8.1.1"
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.20"
+                  classpath "com.android.tools.build:gradle:8.3.0"
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"
               }
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
-          # ২. ফোল্ডার তৈরি
+          # ৩. অ্যাপ ফোল্ডার ও রিসোর্স
           mkdir -p app/src/main/java/com/vibestudio/geminiai
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-hdpi
 
-          # ৩. app/build.gradle (প্লাগইন ভার্সন ফিক্স)
+          # ৪. app/build.gradle (Fixed for Gradle 9 Compatibility)
           cat <<EOF > app/build.gradle
           apply plugin: 'com.android.application'
           apply plugin: 'kotlin-android'
 
           android {
               namespace 'com.vibestudio.geminiai'
-              compileSdk 33
+              compileSdk 34
               defaultConfig {
                   applicationId "com.vibestudio.geminiai"
                   minSdk 27
@@ -53,7 +55,12 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              buildTypes { release { minifyEnabled false } }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+                  }
+              }
           }
           dependencies {
               implementation "androidx.appcompat:appcompat:1.6.1"
@@ -62,25 +69,7 @@ jobs:
           }
           EOF
 
-          # ৪. UI Layout (Splash & Offline)
-          cat <<EOF > app/src/main/res/layout/activity_main.xml
-          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
-              <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
-              <LinearLayout android:id="@+id/splashScreen" android:layout_width="match_parent" android:layout_height="match_parent"
-                  android:gravity="center" android:orientation="vertical">
-                  <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="24sp" android:layout_marginTop="16dp"/>
-              </LinearLayout>
-              <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent"
-                  android:gravity="center" android:orientation="vertical" android:visibility="gone">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ইন্টারনেট সংযোগ নেই" android:textColor="#FFFFFF" android:layout_marginBottom="10dp"/>
-                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:backgroundTint="#4285F4"/>
-              </LinearLayout>
-          </RelativeLayout>
-          EOF
-
-          # ৫. MainActivity.kt (Black Screen & Functionality Fix)
+          # ৫. MainActivity.kt (Splash, Offline & Voice)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -110,8 +99,7 @@ jobs:
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
-                      useWideViewPort = true
-                      loadWithOverviewMode = true
+                      databaseEnabled = true
                   }
 
                   webView.webViewClient = object : WebViewClient() {
@@ -125,6 +113,12 @@ jobs:
                       }
                   }
                   
+                  webView.webChromeClient = object : WebChromeClient() {
+                      override fun onPermissionRequest(request: PermissionRequest) {
+                          request.grant(request.resources)
+                      }
+                  }
+
                   findViewById<Button>(R.id.retryBtn).setOnClickListener {
                       offline.visibility = View.GONE
                       splash.visibility = View.VISIBLE
@@ -137,7 +131,22 @@ jobs:
           }
           EOF
 
-          # ৬. Themes & Icon
+          # ৬. UI Layout & Icons
+          cat <<EOF > app/src/main/res/layout/activity_main.xml
+          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
+              <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
+              <LinearLayout android:id="@+id/splashScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
+                  <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini Ai" android:textColor="#FFFFFF" android:textSize="20sp" android:layout_marginTop="10dp"/>
+              </LinearLayout>
+              <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone">
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Connection" android:textColor="#FFFFFF"/>
+                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="10dp"/>
+              </LinearLayout>
+          </RelativeLayout>
+          EOF
+
           cat <<EOF > app/src/main/res/values/themes.xml
           <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar"/></resources>
           EOF
@@ -153,14 +162,14 @@ jobs:
           </manifest>
           EOF
 
-      - name: Build with Gradle
+      - name: Build with Gradle (Stable Wrapper)
         run: |
-          gradle wrapper --gradle-version 8.1.1
+          gradle wrapper --gradle-version 8.7
           chmod +x gradlew
           ./gradlew assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Native-Fixed
+          name: Gemini-Native-Stable
           path: app/build/outputs/apk/release/app-release-unsigned.apk
