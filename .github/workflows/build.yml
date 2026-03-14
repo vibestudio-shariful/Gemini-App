@@ -1,4 +1,4 @@
-name: Build Gemini Pro Final Fix
+name: Build Gemini Pro Final No-Error
 
 on:
   push:
@@ -16,9 +16,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Install ImageMagick
-        run: sudo apt-get install -y imagemagick
 
       - name: Create Native Project Structure
         run: |
@@ -42,9 +39,6 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          
-          # Fix: Proper directory creation
-          for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p "app/src/main/res/mipmap-$res"; done
 
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
@@ -58,7 +52,7 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              buildTypes { release { minifyEnabled false; shrinkResources false } }
+              buildTypes { release { minifyEnabled false } }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = '17' }
           }
@@ -68,7 +62,7 @@ jobs:
           }
           EOF
 
-          # MainActivity.kt
+          # MainActivity.kt (Strong Voice & No-Zoom)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -123,7 +117,7 @@ jobs:
                                   "meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';" +
                                   "document.getElementsByTagName('head')[0].appendChild(meta);" +
                                   "})()")
-                          splash.animate().alpha(0f).setDuration(1000).withEndAction {
+                          splash.animate().alpha(0f).setDuration(800).withEndAction {
                               splash.visibility = View.GONE
                               webView.visibility = View.VISIBLE
                           }
@@ -132,6 +126,14 @@ jobs:
                   
                   webView.webChromeClient = object : WebChromeClient() {
                       override fun onPermissionRequest(req: PermissionRequest) { req.grant(req.resources) }
+                      override fun onShowFileChooser(w: WebView?, f: ValueCallback<Array<Uri>>?, c: FileChooserParams?): Boolean {
+                          fileCallback = f
+                          val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                              addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                          }
+                          startActivityForResult(Intent.createChooser(intent, "Upload"), 100)
+                          return true
+                      }
                   }
                   webView.loadUrl("https://gemini.google.com/")
               }
@@ -139,44 +141,40 @@ jobs:
           }
           EOF
 
-          # Layout & Themes
+          # Design: Gemini Star Vector Logo
+          cat <<EOF > app/src/main/res/drawable/ic_gemini_logo.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="100dp" android:height="100dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#4285F4" android:pathData="M12,2L14.5,9.5L22,12L14.5,14.5L12,22L9.5,14.5L2,12L9.5,9.5L12,2Z"/>
+          </vector>
+          EOF
+
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
               <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent"
                   android:gravity="center" android:orientation="vertical" android:background="#131314">
-                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@mipmap/ic_launcher" android:layout_marginBottom="30dp"/>
-                  <ProgressBar android:layout_width="40dp" android:layout_height="40dp" android:indeterminateTint="#4285F4"/>
+                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@drawable/ic_gemini_logo"/>
+                  <ProgressBar android:layout_width="45dp" android:layout_height="45dp" android:layout_marginTop="40dp" android:indeterminateTint="#4285F4"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
 
           echo "<resources><style name='Theme.GeminiAi' parent='Theme.MaterialComponents.DayNight.NoActionBar'><item name='android:statusBarColor'>#131314</item></style></resources>" > app/src/main/res/values/themes.xml
 
-          # Image Processing Fix: Use ImageMagick to clean and resize icon
-          curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o raw_logo.png
-          convert raw_logo.png -background none -resize 512x512 -gravity center -extent 512x512 logo.png
-          
-          for res in mdpi:48x48 hdpi:72x72 xhdpi:96x96 xxhdpi:144x144 xxxhdpi:192x192; do
-            size=\${res#*:}
-            folder=\${res%:*}
-            convert logo.png -resize \$size "app/src/main/res/mipmap-\$folder/ic_launcher.png"
-            convert logo.png -resize \$size "app/src/main/res/mipmap-\$folder/ic_launcher_round.png"
-          done
-
-          # Adaptive Icon
+          # Adaptive Icon (Using Vector)
           cat <<EOF > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@android:color/black"/><foreground android:drawable="@mipmap/ic_launcher"/>
+              <background android:drawable="@android:color/black"/><foreground android:drawable="@drawable/ic_gemini_logo"/>
           </adaptive-icon>
           EOF
           cp app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
           cat <<EOF > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-              <application android:label="Gemini Pro" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/Theme.GeminiAi">
+              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+              <application android:label="Gemini Pro" android:icon="@drawable/ic_gemini_logo" android:roundIcon="@drawable/ic_gemini_logo" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
                   <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait">
                       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
                   </activity>
@@ -193,5 +191,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-Success
+          name: Gemini-Pro-NoError
           path: app/build/outputs/apk/release/app-release-unsigned.apk
