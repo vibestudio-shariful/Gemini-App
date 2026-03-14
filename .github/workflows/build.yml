@@ -1,4 +1,4 @@
-name: Build Gemini Ai Native Master
+name: Build Gemini Ai Native Fixed
 
 on:
   push:
@@ -19,25 +19,30 @@ jobs:
 
       - name: Create Native Project Structure
         run: |
-          # ১. রুট লেভেল ফাইল
+          # ১. সেটিংস ও রুট গ্রেডল
           echo "include ':app'" > settings.gradle
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
-              dependencies { classpath "com.android.tools.build:gradle:8.1.1" }
+              dependencies { 
+                  classpath "com.android.tools.build:gradle:8.1.1"
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.20"
+              }
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
-          # ২. ডিরেক্টরি তৈরি
+          # ২. ফোল্ডার তৈরি
           mkdir -p app/src/main/java/com/vibestudio/geminiai
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-hdpi
 
-          # ৩. app/build.gradle (Gradle 9+ compatibility)
+          # ৩. app/build.gradle (প্লাগইন ভার্সন ফিক্স)
           cat <<EOF > app/build.gradle
-          plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+          apply plugin: 'com.android.application'
+          apply plugin: 'kotlin-android'
+
           android {
               namespace 'com.vibestudio.geminiai'
               compileSdk 33
@@ -57,7 +62,7 @@ jobs:
           }
           EOF
 
-          # ৪. স্প্ল্যাশ ও অফলাইন লেআউট (UI Design)
+          # ৪. UI Layout (Splash & Offline)
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
@@ -69,13 +74,13 @@ jobs:
               </LinearLayout>
               <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent"
                   android:gravity="center" android:orientation="vertical" android:visibility="gone">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ইন্টারনেট নেই" android:textColor="#FFFFFF"/>
-                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="আবার চেষ্টা করুন" android:layout_marginTop="10dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ইন্টারনেট সংযোগ নেই" android:textColor="#FFFFFF" android:layout_marginBottom="10dp"/>
+                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:backgroundTint="#4285F4"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
 
-          # ৫. MainActivity.kt (সব লজিক একসাথে)
+          # ৫. MainActivity.kt (Black Screen & Functionality Fix)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -105,6 +110,8 @@ jobs:
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
+                      useWideViewPort = true
+                      loadWithOverviewMode = true
                   }
 
                   webView.webViewClient = object : WebViewClient() {
@@ -121,7 +128,7 @@ jobs:
                   findViewById<Button>(R.id.retryBtn).setOnClickListener {
                       offline.visibility = View.GONE
                       splash.visibility = View.VISIBLE
-                      webView.loadUrl("https://gemini.google.com/")
+                      webView.reload()
                   }
 
                   webView.loadUrl("https://gemini.google.com/")
@@ -130,12 +137,11 @@ jobs:
           }
           EOF
 
-          # ৬. Manifest & Icon
+          # ৬. Themes & Icon
           cat <<EOF > app/src/main/res/values/themes.xml
           <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar"/></resources>
           EOF
           
-          # অফিসিয়াল আইকন ডাউনলোড
           curl -L "https://cdn-icons-png.flaticon.com/512/10561/10561102.png" -o app/src/main/res/mipmap-hdpi/ic_launcher.png
 
           cat <<EOF > app/src/main/AndroidManifest.xml
@@ -156,5 +162,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Native-Pro
+          name: Gemini-Native-Fixed
           path: app/build/outputs/apk/release/app-release-unsigned.apk
