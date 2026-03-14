@@ -1,4 +1,4 @@
-name: Build Gemini Pro Oreo Ultimate
+name: Build Gemini Pro Final Bridge
 
 on:
   push:
@@ -37,7 +37,6 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/res/anim
 
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
@@ -48,8 +47,8 @@ jobs:
                   applicationId "com.vibestudio.geminiai"
                   minSdk 26
                   targetSdk 34
-                  versionCode 10
-                  versionName "1.9-OreoStable"
+                  versionCode 11
+                  versionName "2.0-Ultimate"
               }
               buildTypes { release { minifyEnabled false } }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
@@ -61,18 +60,10 @@ jobs:
           }
           EOF
 
-          # Pulse Animation for Android 8.1
-          cat <<EOF > app/src/main/res/anim/pulse.xml
-          <set xmlns:android="http://schemas.android.com/apk/res/android">
-              <scale android:duration="1000" android:fromXScale="1.0" android:fromYScale="1.0" android:toXScale="1.1" android:toYScale="1.1" android:pivotX="50%" android:pivotY="50%" android:repeatCount="infinite" android:repeatMode="reverse"/>
-          </set>
-          EOF
-
-          # MainActivity.kt (Robust Oreo Download Engine)
+          # MainActivity.kt (Robust Link Interceptor)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
-          import android.app.AlertDialog
           import android.app.DownloadManager
           import android.content.*
           import android.graphics.Color
@@ -80,7 +71,6 @@ jobs:
           import android.os.*
           import android.util.Base64
           import android.view.View
-          import android.view.animation.AnimationUtils
           import android.webkit.*
           import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
@@ -91,7 +81,6 @@ jobs:
           class MainActivity : AppCompatActivity() {
               private lateinit var webView: WebView
               private lateinit var splash: View
-              private lateinit var offlineLayout: LinearLayout
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
@@ -100,23 +89,13 @@ jobs:
                   
                   webView = findViewById(R.id.webView)
                   splash = findViewById(R.id.custom_splash)
-                  offlineLayout = findViewById(R.id.offline_layout)
-                  val logo = findViewById<ImageView>(R.id.splash_logo)
-                  logo.startAnimation(AnimationUtils.loadAnimation(this, R.anim.pulse))
 
                   ActivityCompat.requestPermissions(this, arrayOf(
                       Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE,
-                      Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA
+                      Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
                   ), 1)
 
                   setupWebView()
-                  
-                  findViewById<Button>(R.id.retry_btn).setOnClickListener {
-                      offlineLayout.visibility = View.GONE
-                      splash.visibility = View.VISIBLE
-                      webView.reload()
-                  }
-
                   webView.loadUrl("https://gemini.google.com/")
               }
 
@@ -125,89 +104,80 @@ jobs:
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       allowFileAccess = true
-                      databaseEnabled = true
                       setSupportZoom(false)
                       userAgentString = "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
                   }
 
+                  // POWERFUL JS INTERFACE
                   webView.addJavascriptInterface(object : Any() {
                       @JavascriptInterface
-                      fun processBlob(base64: String, mime: String) {
-                          showDownloadDialog(base64, mime)
+                      fun downloadBlob(base64: String, mime: String) {
+                          saveFile(base64, mime)
                       }
-                  }, "AndroidBridge")
+                  }, "Android")
 
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(v: WebView?, u: String?) {
-                          splash.animate().alpha(0f).setDuration(400).withEndAction { splash.visibility = View.GONE; webView.visibility = View.VISIBLE }
+                          splash.visibility = View.GONE; webView.visibility = View.VISIBLE
                           
-                          // Injected Script to catch Blob Images from Gemini
+                          // এই স্ক্রিপ্টটি ডাউনলোড লিংকে ক্লিক করলেই ডাটা ছিনিয়ে নেবে
                           v?.loadUrl("javascript:(function() { " +
-                              "var oldCreate = URL.createObjectURL; " +
-                              "URL.createObjectURL = function(blob) { " +
-                              "  if (blob.type.includes('image')) { " +
-                              "    var reader = new FileReader(); " +
-                              "    reader.onload = function() { AndroidBridge.processBlob(reader.result, blob.type); }; " +
-                              "    reader.readAsDataURL(blob); " +
-                              "  } " +
-                              "  return oldCreate(blob); " +
-                              "}; " +
-                              "})()")
-                      }
-                      override fun onReceivedError(v: WebView?, r: WebResourceRequest?, e: WebResourceError?) {
-                          webView.visibility = View.GONE; offlineLayout.visibility = View.VISIBLE; splash.visibility = View.GONE
+                                  "document.addEventListener('click', function(e) { " +
+                                  "  var t = e.target.closest('a'); " +
+                                  "  if (t && t.href.startsWith('blob:')) { " +
+                                  "    e.preventDefault(); " +
+                                  "    var xhr = new XMLHttpRequest(); " +
+                                  "    xhr.open('GET', t.href, true); " +
+                                  "    xhr.responseType = 'blob'; " +
+                                  "    xhr.onload = function() { " +
+                                  "      var reader = new FileReader(); " +
+                                  "      reader.onloadend = function() { " +
+                                  "        Android.downloadBlob(reader.result, xhr.response.type); " +
+                                  "      }; " +
+                                  "      reader.readAsDataURL(xhr.response); " +
+                                  "    }; " +
+                                  "    xhr.send(); " +
+                                  "  } " +
+                                  "}, true); " +
+                                  "})()")
                       }
                   }
               }
 
-              private fun showDownloadDialog(base64: String, mime: String) {
-                  runOnUiThread {
-                      AlertDialog.Builder(this)
-                          .setTitle("Download Image")
-                          .setMessage("Do you want to save this image to your gallery?")
-                          .setPositiveButton("Download") { _, _ -> saveImage(base64, mime) }
-                          .setNegativeButton("Cancel", null)
-                          .show()
-                  }
-              }
-
-              private fun saveImage(base64: String, mime: String) {
+              private fun saveFile(base64: String, mime: String) {
                   try {
                       val pureBase64 = base64.substring(base64.indexOf(",") + 1)
-                      val data = Base64.decode(pureBase64, Base64.DEFAULT)
+                      val decoded = Base64.decode(pureBase64, Base64.DEFAULT)
                       val ext = if (mime.contains("png")) "png" else "jpg"
                       val name = "Gemini_\${System.currentTimeMillis()}.\$ext"
+                      
                       val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), name)
-                      
-                      FileOutputStream(file).use { it.write(data) }
-                      
-                      val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                      dm.addCompletedDownload(name, "Gemini Generated Image", true, mime, file.absolutePath, data.size.toLong(), true)
-                      Toast.makeText(this, "Saved to Downloads!", Toast.LENGTH_LONG).show()
+                      val fos = FileOutputStream(file)
+                      fos.write(decoded)
+                      fos.close()
+
+                      runOnUiThread { 
+                          Toast.makeText(this@MainActivity, "Saved to Downloads!", Toast.LENGTH_LONG).show()
+                          // গ্যালারিতে দেখানোর জন্য মিডিয়া স্ক্যান
+                          MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), null, null)
+                      }
                   } catch (e: Exception) {
-                      Toast.makeText(this, "Error: Could not save file", Toast.LENGTH_SHORT).show()
+                      runOnUiThread { Toast.makeText(this, "Save Failed: \${e.message}", Toast.LENGTH_SHORT).show() }
                   }
               }
 
               override fun onBackPressed() {
-                  if (webView.canGoBack()) webView.goBack() else {
-                      AlertDialog.Builder(this).setMessage("Exit App?").setPositiveButton("Yes") { _, _ -> finish() }.setNegativeButton("No", null).show()
-                  }
+                  if (webView.canGoBack()) webView.goBack() else finish()
               }
           }
           EOF
 
-          # Modern Layout (Compatible with 8.1)
+          # Simple Dark UI
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
-              <LinearLayout android:id="@+id/offline_layout" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone" android:padding="20dp">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Internet Connection" android:textColor="#FFFFFF" android:textSize="18sp"/>
-                  <Button android:id="@+id/retry_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="20dp" android:backgroundTint="#4285F4"/>
-              </LinearLayout>
-              <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:background="#131314">
-                  <ImageView android:id="@+id/splash_logo" android:layout_width="80dp" android:layout_height="80dp" android:src="@drawable/ic_gemini_logo"/>
-                  <ProgressBar android:layout_width="40dp" android:layout_height="40dp" android:layout_marginTop="40dp" android:indeterminateTint="#4285F4"/>
+              <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:background="#131314">
+                  <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
@@ -224,7 +194,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
               <application android:label="Gemini Pro" android:icon="@drawable/ic_gemini_logo" android:theme="@style/Theme.GeminiAi" android:requestLegacyExternalStorage="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait" android:configChanges="orientation|screenSize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+                  <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
               </application>
           </manifest>
           EOF
@@ -238,5 +208,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-v1.9-Final
+          name: Gemini-Pro-Ultimate-v2
           path: app/build/outputs/apk/release/app-release-unsigned.apk
