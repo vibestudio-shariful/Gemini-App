@@ -1,4 +1,4 @@
-name: Build Gemini Ai Premium Final Fix
+name: Build Gemini Ai Premium Final Fixed
 
 on:
   push:
@@ -39,7 +39,7 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-xxxhdpi
 
-          # app/build.gradle (Added aaptOptions to skip image errors)
+          # app/build.gradle (Fixed Syntax Error)
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
           android {
@@ -52,13 +52,19 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              # ইমেজ কম্পাইল এরর এড়াতে এই অপশনটি যোগ করা হয়েছে
+              
               aaptOptions {
                   cruncherEnabled = false
                   useNewCruncher = false
               }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = '17' }
+              
+              compileOptions { 
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17 
+              }
+              kotlinOptions { 
+                  jvmTarget = '17' 
+              }
           }
           dependencies {
               implementation "androidx.appcompat:appcompat:1.6.1"
@@ -66,7 +72,7 @@ jobs:
           }
           EOF
 
-          # MainActivity.kt (Voice, File & UI Logic)
+          # MainActivity.kt
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -144,7 +150,7 @@ jobs:
           }
           EOF
 
-          # UI Design Layout
+          # UI Design
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
@@ -163,7 +169,7 @@ jobs:
           <item name="android:statusBarColor">#131314</item></style></resources>
           EOF
           
-          # অফিসিয়াল জেমিনি আইকন ডাউনলোড (সরাসরি গুগলের স্ট্যাটিক লিঙ্ক থেকে)
+          # অফিসিয়াল আইকন ডাউনলোড
           curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
 
