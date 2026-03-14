@@ -1,4 +1,4 @@
-name: Build Gemini Pro Ultimate Fixed
+name: Build Gemini Pro Final Fix
 
 on:
   push:
@@ -16,6 +16,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Install ImageMagick
+        run: sudo apt-get install -y imagemagick
 
       - name: Create Native Project Structure
         run: |
@@ -39,7 +42,8 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          # Fixed Loop for Directories
+          
+          # Fix: Proper directory creation
           for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p "app/src/main/res/mipmap-$res"; done
 
           cat <<EOF > app/build.gradle
@@ -54,7 +58,7 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              buildTypes { release { minifyEnabled false } }
+              buildTypes { release { minifyEnabled false; shrinkResources false } }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = '17' }
           }
@@ -64,7 +68,7 @@ jobs:
           }
           EOF
 
-          # MainActivity.kt (Adaptive UI & Anti-Zoom)
+          # MainActivity.kt
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -88,7 +92,6 @@ jobs:
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
                   
-                  // Perfect Status Bar for Oreo and Above
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                       window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
                       window.statusBarColor = Color.parseColor("#131314")
@@ -98,15 +101,13 @@ jobs:
                   val splash = findViewById<View>(R.id.custom_splash)
 
                   ActivityCompat.requestPermissions(this, arrayOf(
-                      Manifest.permission.RECORD_AUDIO, 
-                      Manifest.permission.CAMERA,
+                      Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA,
                       Manifest.permission.MODIFY_AUDIO_SETTINGS
                   ), 1)
 
                   webView.settings.apply {
                       javaScriptEnabled = true
                       domStorageEnabled = true
-                      mediaPlaybackRequiresUserGesture = false
                       allowFileAccess = true
                       setSupportZoom(false)
                       useWideViewPort = true
@@ -116,15 +117,13 @@ jobs:
 
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
-                          // No-Zoom Script
                           view?.loadUrl("javascript:(function() { " +
                                   "var meta = document.createElement('meta');" +
                                   "meta.name = 'viewport';" +
                                   "meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';" +
                                   "document.getElementsByTagName('head')[0].appendChild(meta);" +
                                   "})()")
-                          
-                          splash.animate().alpha(0f).setDuration(1200).withEndAction {
+                          splash.animate().alpha(0f).setDuration(1000).withEndAction {
                               splash.visibility = View.GONE
                               webView.visibility = View.VISIBLE
                           }
@@ -132,70 +131,41 @@ jobs:
                   }
                   
                   webView.webChromeClient = object : WebChromeClient() {
-                      override fun onPermissionRequest(request: PermissionRequest) {
-                          request.grant(request.resources)
-                      }
-                      override fun onShowFileChooser(w: WebView?, f: ValueCallback<Array<Uri>>?, c: FileChooserParams?): Boolean {
-                          fileCallback = f
-                          val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                              addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
-                          }
-                          startActivityForResult(Intent.createChooser(intent, "Upload"), 100)
-                          return true
-                      }
+                      override fun onPermissionRequest(req: PermissionRequest) { req.grant(req.resources) }
                   }
                   webView.loadUrl("https://gemini.google.com/")
               }
-
-              override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-                  super.onActivityResult(requestCode, resultCode, data)
-                  if (requestCode == 100) {
-                      val results = if (data == null || resultCode != RESULT_OK) null else arrayOf(data.data!!)
-                      fileCallback?.onReceiveValue(results as Array<Uri>?)
-                      fileCallback = null
-                  }
-              }
-
               override fun onBackPressed() { if(webView.canGoBack()) webView.goBack() else super.onBackPressed() }
           }
           EOF
 
-          # UI Design with Sleek Loading Animation
+          # Layout & Themes
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
-              
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
-              
               <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent"
                   android:gravity="center" android:orientation="vertical" android:background="#131314">
-                  
-                  <ImageView android:id="@+id/splash_logo" android:layout_width="100dp" android:layout_height="100dp" 
-                      android:src="@mipmap/ic_launcher" android:layout_marginBottom="50dp"/>
-                  
-                  <ProgressBar android:layout_width="45dp" android:layout_height="45dp"
-                      android:indeterminateTint="#4285F4" style="@android:style/Widget.Material.ProgressBar"/>
-                  
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
-                      android:text="Initializing..." android:textColor="#808080" android:textSize="14sp"
-                      android:layout_marginTop="25dp" android:letterSpacing="0.2"/>
+                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@mipmap/ic_launcher" android:layout_marginBottom="30dp"/>
+                  <ProgressBar android:layout_width="40dp" android:layout_height="40dp" android:indeterminateTint="#4285F4"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
 
-          cat <<EOF > app/src/main/res/values/themes.xml
-          <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-          <item name="android:statusBarColor">#131314</item>
-          </style></resources>
-          EOF
+          echo "<resources><style name='Theme.GeminiAi' parent='Theme.MaterialComponents.DayNight.NoActionBar'><item name='android:statusBarColor'>#131314</item></style></resources>" > app/src/main/res/values/themes.xml
+
+          # Image Processing Fix: Use ImageMagick to clean and resize icon
+          curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o raw_logo.png
+          convert raw_logo.png -background none -resize 512x512 -gravity center -extent 512x512 logo.png
           
-          # Gemini Logo Fix
-          curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o logo.png
-          for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            cp logo.png "app/src/main/res/mipmap-$res/ic_launcher.png"
-            cp logo.png "app/src/main/res/mipmap-$res/ic_launcher_round.png"
+          for res in mdpi:48x48 hdpi:72x72 xhdpi:96x96 xxhdpi:144x144 xxxhdpi:192x192; do
+            size=\${res#*:}
+            folder=\${res%:*}
+            convert logo.png -resize \$size "app/src/main/res/mipmap-\$folder/ic_launcher.png"
+            convert logo.png -resize \$size "app/src/main/res/mipmap-\$folder/ic_launcher_round.png"
           done
-          
+
+          # Adaptive Icon
           cat <<EOF > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
               <background android:drawable="@android:color/black"/><foreground android:drawable="@mipmap/ic_launcher"/>
@@ -205,9 +175,9 @@ jobs:
 
           cat <<EOF > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-              <application android:label="Gemini Pro" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize" android:screenOrientation="portrait">
+              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+              <application android:label="Gemini Pro" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/Theme.GeminiAi">
+                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait">
                       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
                   </activity>
               </application>
@@ -223,5 +193,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-Build
+          name: Gemini-Pro-Success
           path: app/build/outputs/apk/release/app-release-unsigned.apk
