@@ -19,7 +19,7 @@ jobs:
 
       - name: Create Native Project Structure
         run: |
-          # ১. সেটিংস ও অ্যান্ড্রয়েড প্রপার্টিজ (সবচাইতে জরুরি)
+          # ১. সেটিংস ও অ্যান্ড্রয়েড প্রপার্টিজ
           echo "include ':app'" > settings.gradle
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
@@ -42,7 +42,7 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-hdpi
 
-          # ৪. app/build.gradle (Updated)
+          # ৪. app/build.gradle (JVM Target Compatibility Fixed)
           cat <<EOF > app/build.gradle
           plugins {
               id 'com.android.application'
@@ -63,6 +63,13 @@ jobs:
                       minifyEnabled false
                   }
               }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
           }
           dependencies {
               implementation "androidx.appcompat:appcompat:1.6.1"
@@ -71,7 +78,7 @@ jobs:
           }
           EOF
 
-          # ৫. MainActivity.kt (Splash & Permissions)
+          # ৫. MainActivity.kt
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -101,7 +108,6 @@ jobs:
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
-                      databaseEnabled = true
                   }
 
                   webView.webViewClient = object : WebViewClient() {
@@ -142,7 +148,6 @@ jobs:
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
               <LinearLayout android:id="@+id/splashScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
                   <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="22sp" android:layout_marginTop="12dp"/>
               </LinearLayout>
               <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone">
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Connection" android:textColor="#FFFFFF"/>
