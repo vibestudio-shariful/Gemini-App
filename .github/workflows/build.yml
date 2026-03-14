@@ -22,7 +22,7 @@ jobs:
           # ১. সেটিংস
           echo "include ':app'" > settings.gradle
 
-          # ২. রুট build.gradle (Modern Plugins DSL)
+          # ২. রুট build.gradle
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
@@ -40,17 +40,15 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-hdpi
 
-          # ৪. app/build.gradle (Fixed CompileSDK & Plugin syntax)
+          # ৪. app/build.gradle
           cat <<EOF > app/build.gradle
           plugins {
               id 'com.android.application'
               id 'org.jetbrains.kotlin.android'
           }
-
           android {
               namespace 'com.vibestudio.geminiai'
               compileSdk 34
-
               defaultConfig {
                   applicationId "com.vibestudio.geminiai"
                   minSdk 27
@@ -58,14 +56,12 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-
               buildTypes {
                   release {
                       minifyEnabled false
                   }
               }
           }
-
           dependencies {
               implementation "androidx.appcompat:appcompat:1.6.1"
               implementation "com.google.android.material:material:1.9.0"
@@ -73,7 +69,7 @@ jobs:
           }
           EOF
 
-          # ৫. MainActivity.kt (Splash & Permissions)
+          # ৫. MainActivity.kt (Native handling for Oreo)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -92,24 +88,17 @@ jobs:
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
-                  
                   webView = findViewById(R.id.webView)
                   splash = findViewById(R.id.splashScreen)
                   offline = findViewById(R.id.offlineScreen)
 
-                  ActivityCompat.requestPermissions(this, arrayOf(
-                      Manifest.permission.RECORD_AUDIO, 
-                      Manifest.permission.CAMERA
-                  ), 1)
+                  ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA), 1)
 
                   webView.settings.apply {
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
-                      databaseEnabled = true
-                      cacheMode = WebSettings.LOAD_DEFAULT
                   }
-
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
                           splash.visibility = View.GONE
@@ -120,25 +109,19 @@ jobs:
                           offline.visibility = View.VISIBLE
                       }
                   }
-                  
                   webView.webChromeClient = object : WebChromeClient() {
                       override fun onPermissionRequest(request: PermissionRequest) {
                           request.grant(request.resources)
                       }
                   }
-
                   findViewById<Button>(R.id.retryBtn).setOnClickListener {
                       offline.visibility = View.GONE
                       splash.visibility = View.VISIBLE
                       webView.reload()
                   }
-
                   webView.loadUrl("https://gemini.google.com/")
               }
-              override fun onBackPressed() {
-                  if(webView.canGoBack()) webBack() else super.onBackPressed()
-              }
-              private fun webBack() { webView.goBack() }
+              override fun onBackPressed() { if(webView.canGoBack()) webView.goBack() else super.onBackPressed() }
           }
           EOF
 
@@ -149,11 +132,10 @@ jobs:
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
               <LinearLayout android:id="@+id/splashScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
                   <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="22sp" android:layout_marginTop="12dp"/>
               </LinearLayout>
               <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Offline" android:textColor="#FFFFFF"/>
-                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="12dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Internet" android:textColor="#FFFFFF"/>
+                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="10dp"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
@@ -167,20 +149,23 @@ jobs:
           cat <<EOF > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/>
-              <application android:label="Gemini Ai" android:icon="@mipmap/ic_launcher" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
+              <application android:label="Gemini" android:icon="@mipmap/ic_launcher" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
                   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
               </application>
           </manifest>
           EOF
 
-      - name: Build with Gradle 8.5 (Stable)
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Build with Gradle
         run: |
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew clean assembleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Native-Success
+          name: Gemini-Pro-Native
           path: app/build/outputs/apk/release/app-release-unsigned.apk
