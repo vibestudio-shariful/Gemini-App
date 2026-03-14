@@ -1,4 +1,4 @@
-name: Build Gemini Pro Advanced UI
+name: Build Gemini Pro Modern Animation
 
 on:
   push:
@@ -38,6 +38,7 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/anim
           mkdir -p app/src/main/res/mipmap-anydpi-v26
 
           cat <<EOF > app/build.gradle
@@ -49,8 +50,8 @@ jobs:
                   applicationId "com.vibestudio.geminiai"
                   minSdk 27
                   targetSdk 34
-                  versionCode 3
-                  versionName "1.2"
+                  versionCode 5
+                  versionName "1.4"
               }
               buildTypes { release { minifyEnabled false } }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
@@ -62,7 +63,15 @@ jobs:
           }
           EOF
 
-          # MainActivity.kt (Offline Support & Download Popup)
+          # Pulse Animation XML
+          cat <<EOF > app/src/main/res/anim/pulse.xml
+          <set xmlns:android="http://schemas.android.com/apk/res/android" android:shareInterpolator="false">
+              <scale android:duration="1000" android:fromXScale="1.0" android:fromYScale="1.0" android:toXScale="1.15" android:toYScale="1.15" android:pivotX="50%" android:pivotY="50%" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+              <alpha android:duration="1000" android:fromAlpha="1.0" android:toAlpha="0.7" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+          </set>
+          EOF
+
+          # MainActivity.kt (Modern Animation & Download Fix)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -74,7 +83,7 @@ jobs:
           import android.net.Uri
           import android.os.*
           import android.view.View
-          import android.view.WindowManager
+          import android.view.animation.AnimationUtils
           import android.webkit.*
           import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
@@ -97,6 +106,11 @@ jobs:
                   webView = findViewById(R.id.webView)
                   offlineLayout = findViewById(R.id.offline_layout)
                   splash = findViewById(R.id.custom_splash)
+                  val splashLogo = findViewById<ImageView>(R.id.splash_logo)
+
+                  // Start Pulse Animation
+                  val pulse = AnimationUtils.loadAnimation(this, R.anim.pulse)
+                  splashLogo.startAnimation(pulse)
 
                   ActivityCompat.requestPermissions(this, arrayOf(
                       Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA,
@@ -110,7 +124,6 @@ jobs:
                       splash.visibility = View.VISIBLE
                       webView.reload()
                   }
-
                   webView.loadUrl("https://gemini.google.com/")
               }
 
@@ -119,14 +132,13 @@ jobs:
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       allowFileAccess = true
-                      databaseEnabled = true
                       setSupportZoom(false)
                       userAgentString = "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
                   }
 
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
-                          splash.animate().alpha(0f).setDuration(800).withEndAction {
+                          splash.animate().alpha(0f).setDuration(600).withEndAction {
                               splash.visibility = View.GONE
                               webView.visibility = View.VISIBLE
                           }
@@ -138,23 +150,25 @@ jobs:
                       }
                   }
 
-                  // DOWNLOAD POPUP LOGIC
                   webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
-                      AlertDialog.Builder(this)
-                          .setTitle("Download File")
-                          .setMessage("Do you want to download this file?")
-                          .setPositiveButton("Download") { _, _ ->
+                      runOnUiThread {
+                          val builder = AlertDialog.Builder(this@MainActivity)
+                          builder.setTitle("Confirm Download")
+                          builder.setMessage("Do you want to download this file?")
+                          builder.setPositiveButton("Download") { _, _ ->
                               val request = DownloadManager.Request(Uri.parse(url))
                               request.setMimeType(mimetype)
                               request.addRequestHeader("User-Agent", userAgent)
-                              request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype))
+                              val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+                              request.setTitle(fileName)
                               request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                              request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype))
+                              request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
                               (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-                              Toast.makeText(this, "Downloading...", Toast.LENGTH_SHORT).show()
+                              Toast.makeText(this@MainActivity, "Downloading...", Toast.LENGTH_SHORT).show()
                           }
-                          .setNegativeButton("Cancel", null)
-                          .show()
+                          builder.setNegativeButton("Cancel", null)
+                          builder.show()
+                      }
                   }
 
                   webView.webChromeClient = object : WebChromeClient() {
@@ -175,32 +189,41 @@ jobs:
                   }
               }
 
-              override fun onBackPressed() { if(webView.canGoBack()) webView.goBack() else super.onBackPressed() }
+              override fun onBackPressed() {
+                  if (webView.canGoBack()) {
+                      webView.goBack()
+                  } else {
+                      val builder = AlertDialog.Builder(this)
+                      builder.setMessage("Exit Gemini Pro?")
+                      builder.setPositiveButton("Exit") { _, _ -> finish() }
+                      builder.setNegativeButton("Stay", null)
+                      builder.show()
+                  }
+              }
           }
           EOF
 
-          # Design: Pulse Animation Drawable
+          # Gemini Star Logo Vector
           cat <<EOF > app/src/main/res/drawable/ic_gemini_logo.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="100dp" android:height="100dp" android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#4285F4" android:pathData="M12,2L14.5,9.5L22,12L14.5,14.5L12,22L9.5,14.5L2,12L9.5,9.5L12,2Z"/>
           </vector>
           EOF
 
-          # Layout with Offline UI and Pulse Loader
+          # Layout with Modern Splash UI
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
               
-              <LinearLayout android:id="@+id/offline_layout" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone">
-                  <ImageView android:layout_width="80dp" android:layout_height="80dp" android:src="@drawable/ic_gemini_logo" android:alpha="0.3"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Offline" android:textColor="#FFFFFF" android:textSize="20sp" android:layout_marginTop="20dp"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Please check your connection" android:textColor="#808080" android:layout_marginTop="8dp"/>
+              <LinearLayout android:id="@+id/offline_layout" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone" android:padding="30dp">
+                  <ImageView android:layout_width="80dp" android:layout_height="80dp" android:src="@drawable/ic_gemini_logo" android:alpha="0.2"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Connection" android:textColor="#FFFFFF" android:textSize="18sp" android:layout_marginTop="20dp"/>
                   <Button android:id="@+id/retry_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="30dp" android:backgroundTint="#4285F4"/>
               </LinearLayout>
 
               <LinearLayout android:id="@+id/custom_splash" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:background="#131314">
-                  <ImageView android:layout_width="100dp" android:layout_height="100dp" android:src="@drawable/ic_gemini_logo"/>
-                  <ProgressBar android:layout_width="40dp" android:layout_height="40dp" android:layout_marginTop="50dp" android:indeterminateTint="#4285F4"/>
+                  <ImageView android:id="@+id/splash_logo" android:layout_width="100dp" android:layout_height="100dp" android:src="@drawable/ic_gemini_logo"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GEMINI" android:textColor="#4285F4" android:textSize="12sp" android:textStyle="bold" android:layout_marginTop="20dp" android:letterSpacing="0.5"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
@@ -232,5 +255,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-v1.2
+          name: Gemini-Pro-Modern-UI
           path: app/build/outputs/apk/release/app-release-unsigned.apk
