@@ -19,8 +19,10 @@ jobs:
 
       - name: Create Native Project Structure
         run: |
-          # ১. সেটিংস
+          # ১. সেটিংস ও অ্যান্ড্রয়েড প্রপার্টিজ (সবচাইতে জরুরি)
           echo "include ':app'" > settings.gradle
+          echo "android.useAndroidX=true" > gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
 
           # ২. রুট build.gradle
           cat <<EOF > build.gradle
@@ -34,13 +36,13 @@ jobs:
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
-          # ৩. ফোল্ডার স্ট্রাকচার
+          # ৩. ডিরেক্টরি তৈরি
           mkdir -p app/src/main/java/com/vibestudio/geminiai
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-hdpi
 
-          # ৪. app/build.gradle
+          # ৪. app/build.gradle (Updated)
           cat <<EOF > app/build.gradle
           plugins {
               id 'com.android.application'
@@ -69,7 +71,7 @@ jobs:
           }
           EOF
 
-          # ৫. MainActivity.kt (Native handling for Oreo)
+          # ৫. MainActivity.kt (Splash & Permissions)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -88,6 +90,7 @@ jobs:
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
+                  
                   webView = findViewById(R.id.webView)
                   splash = findViewById(R.id.splashScreen)
                   offline = findViewById(R.id.offlineScreen)
@@ -98,7 +101,9 @@ jobs:
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
+                      databaseEnabled = true
                   }
+
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
                           splash.visibility = View.GONE
@@ -109,19 +114,24 @@ jobs:
                           offline.visibility = View.VISIBLE
                       }
                   }
+                  
                   webView.webChromeClient = object : WebChromeClient() {
                       override fun onPermissionRequest(request: PermissionRequest) {
                           request.grant(request.resources)
                       }
                   }
+
                   findViewById<Button>(R.id.retryBtn).setOnClickListener {
                       offline.visibility = View.GONE
                       splash.visibility = View.VISIBLE
                       webView.reload()
                   }
+
                   webView.loadUrl("https://gemini.google.com/")
               }
-              override fun onBackPressed() { if(webView.canGoBack()) webView.goBack() else super.onBackPressed() }
+              override fun onBackPressed() {
+                  if(webView.canGoBack()) webView.goBack() else super.onBackPressed()
+              }
           }
           EOF
 
@@ -132,10 +142,11 @@ jobs:
               <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
               <LinearLayout android:id="@+id/splashScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
                   <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="22sp" android:layout_marginTop="12dp"/>
               </LinearLayout>
               <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Internet" android:textColor="#FFFFFF"/>
-                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="10dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Connection" android:textColor="#FFFFFF"/>
+                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Retry" android:layout_marginTop="12dp"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
@@ -155,17 +166,14 @@ jobs:
           </manifest>
           EOF
 
-      - name: Accept Android Licenses
-        run: yes | sdkmanager --licenses || true
-
       - name: Build with Gradle
         run: |
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
-          ./gradlew clean assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Pro-Native
+          name: Gemini-Native-Final
           path: app/build/outputs/apk/release/app-release-unsigned.apk
