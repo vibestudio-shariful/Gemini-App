@@ -1,4 +1,4 @@
-name: Build Gemini Pro Ultimate Dynamic
+name: Build Gemini Pro Final Fix
 
 on:
   push:
@@ -63,7 +63,7 @@ jobs:
           }
           EOF
 
-          # MainActivity.kt (Dynamic Status Bar & Anti-Zoom Fix)
+          # MainActivity.kt (Dynamic Status Bar & Fixed Permissions)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
@@ -73,7 +73,7 @@ jobs:
           import android.os.Build
           import android.os.Bundle
           import android.view.View
-          import android.view.WindowInsetsController
+          import android.view.WindowManager
           import android.webkit.*
           import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
@@ -87,6 +87,12 @@ jobs:
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
                   
+                  // Make status bar clean
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                      window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                      window.statusBarColor = Color.parseColor("#131314")
+                  }
+
                   webView = findViewById(R.id.webView)
                   val splash = findViewById<View>(R.id.custom_splash)
 
@@ -96,11 +102,6 @@ jobs:
                       Manifest.permission.MODIFY_AUDIO_SETTINGS
                   ), 1)
 
-                  setupWebView()
-                  webView.loadUrl("https://gemini.google.com/")
-              }
-
-              private fun setupWebView() {
                   webView.settings.apply {
                       javaScriptEnabled = true
                       domStorageEnabled = true
@@ -115,7 +116,7 @@ jobs:
 
                   webView.webViewClient = object : WebViewClient() {
                       override fun onPageFinished(view: WebView?, url: String?) {
-                          // Anti-Zoom & Theme Syncing JS
+                          // Meta tag injection to prevent zoom
                           view?.loadUrl("javascript:(function() { " +
                                   "var meta = document.createElement('meta');" +
                                   "meta.name = 'viewport';" +
@@ -123,11 +124,10 @@ jobs:
                                   "document.getElementsByTagName('head')[0].appendChild(meta);" +
                                   "})()")
                           
-                          findViewById<View>(R.id.custom_splash).animate().alpha(0f).setDuration(1000).withEndAction {
-                              findViewById<View>(R.id.custom_splash).visibility = View.GONE
+                          splash.animate().alpha(0f).setDuration(1200).withEndAction {
+                              splash.visibility = View.GONE
                               webView.visibility = View.VISIBLE
                           }
-                          updateStatusBarColor()
                       }
                   }
                   
@@ -135,13 +135,24 @@ jobs:
                       override fun onPermissionRequest(request: PermissionRequest) {
                           request.grant(request.resources)
                       }
+                      override fun onShowFileChooser(w: WebView?, f: ValueCallback<Array<Uri>>?, c: FileChooserParams?): Boolean {
+                          fileCallback = f
+                          val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                              addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                          }
+                          startActivityForResult(Intent.createChooser(intent, "Upload"), 100)
+                          return true
+                      }
                   }
+                  webView.loadUrl("https://gemini.google.com/")
               }
 
-              private fun updateStatusBarColor() {
-                  // ওরিও ফোনে স্ট্যাটাস বার কালার হ্যান্ডলিং
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                      window.statusBarColor = Color.parseColor("#131314") // Default Dark
+              override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+                  super.onActivityResult(requestCode, resultCode, data)
+                  if (requestCode == 100) {
+                      val results = if (data == null || resultCode != RESULT_OK) null else arrayOf(data.data!!)
+                      fileCallback?.onReceiveValue(results as Array<Uri>?)
+                      fileCallback = null
                   }
               }
 
@@ -149,7 +160,7 @@ jobs:
           }
           EOF
 
-          # UI Design with Advanced Loading
+          # UI Design with Pulse Loader
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
@@ -160,18 +171,57 @@ jobs:
                   android:gravity="center" android:orientation="vertical" android:background="#131314">
                   
                   <ImageView android:id="@+id/splash_logo" android:layout_width="100dp" android:layout_height="100dp" 
-                      android:src="@mipmap/ic_launcher" android:layout_marginBottom="30dp"/>
+                      android:src="@mipmap/ic_launcher" android:layout_marginBottom="40dp"/>
                   
-                  <ProgressBar android:layout_width="45dp" android:layout_height="45dp"
-                      style="@android:style/Widget.Material.ProgressBar.Small"
-                      android:indeterminateTint="#4285F4" android:layout_marginTop="20dp"/>
-                      
+                  <ProgressBar android:layout_width="50dp" android:layout_height="50dp"
+                      android:indeterminateTint="#4285F4" android:indeterminate="true"/>
+                  
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
-                      android:text="Processing..." android:textColor="#808080" android:textSize="14sp"
-                      android:layout_marginTop="15dp" android:letterSpacing="0.2"/>
+                      android:text="Initializing Gemini Pro" android:textColor="#606060" android:textSize="14sp"
+                      android:layout_marginTop="20dp" android:letterSpacing="0.1"/>
               </LinearLayout>
           </RelativeLayout>
           EOF
 
           cat <<EOF > app/src/main/res/values/themes.xml
           <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+          <item name="android:statusBarColor">#131314</item>
+          </style></resources>
+          EOF
+          
+          # অফিসিয়াল জেমিনি লোগো ও আইকন ফিক্স
+          curl -L "https://www.gstatic.com/lamda/images/favicon_v1_150160d13988652c75427.png" -o logo.png
+          for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp logo.png app/src/main/res/mipmap-\$res/ic_launcher.png
+            cp logo.png app/src/main/res/mipmap-\$res/ic_launcher_round.png
+          done
+          
+          cat <<EOF > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@android:color/black"/><foreground android:drawable="@mipmap/ic_launcher"/>
+          </adaptive-icon>
+          EOF
+          cp app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+          cat <<EOF > app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+              <application android:label="Gemini Pro" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
+                  <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize" android:screenOrientation="portrait">
+                      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+      - name: Build with Gradle
+        run: |
+          gradle wrapper --gradle-version 8.5
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gemini-Pro-Final-Fixed
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
