@@ -1,4 +1,4 @@
-name: Build Gemini Ai Native Final
+name: Build Gemini Ai Native Master
 
 on:
   push:
@@ -19,29 +19,25 @@ jobs:
 
       - name: Create Native Project Structure
         run: |
-          # ১. রুট লেভেলে সেটিংস ফাইল তৈরি
+          # ১. রুট লেভেল ফাইল
           echo "include ':app'" > settings.gradle
-
-          # ২. রুট build.gradle তৈরি
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { classpath "com.android.tools.build:gradle:8.1.1" }
           }
-          allprojects {
-              repositories { google(); mavenCentral() }
-          }
+          allprojects { repositories { google(); mavenCentral() } }
           EOF
 
-          # ৩. অ্যাপ ফোল্ডার ও কোড স্ট্রাকচার
+          # ২. ডিরেক্টরি তৈরি
           mkdir -p app/src/main/java/com/vibestudio/geminiai
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/mipmap-hdpi
 
-          # ৪. app/build.gradle
+          # ৩. app/build.gradle (Gradle 9+ compatibility)
           cat <<EOF > app/build.gradle
-          plugins { id 'com.android.application' }
+          plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
           android {
               namespace 'com.vibestudio.geminiai'
               compileSdk 33
@@ -57,69 +53,108 @@ jobs:
           dependencies {
               implementation "androidx.appcompat:appcompat:1.6.1"
               implementation "com.google.android.material:material:1.9.0"
+              implementation "androidx.constraintlayout:constraintlayout:2.1.4"
           }
           EOF
 
-          # ৫. MainActivity.kt (ভয়েস ও ফাইল আপলোড সাপোর্টসহ)
+          # ৪. স্প্ল্যাশ ও অফলাইন লেআউট (UI Design)
+          cat <<EOF > app/src/main/res/layout/activity_main.xml
+          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent" android:background="#131314">
+              <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone"/>
+              <LinearLayout android:id="@+id/splashScreen" android:layout_width="match_parent" android:layout_height="match_parent"
+                  android:gravity="center" android:orientation="vertical">
+                  <ProgressBar android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminateTint="#4285F4"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini" android:textColor="#FFFFFF" android:textSize="24sp" android:layout_marginTop="16dp"/>
+              </LinearLayout>
+              <LinearLayout android:id="@+id/offlineScreen" android:layout_width="match_parent" android:layout_height="match_parent"
+                  android:gravity="center" android:orientation="vertical" android:visibility="gone">
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ইন্টারনেট নেই" android:textColor="#FFFFFF"/>
+                  <Button android:id="@+id/retryBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="আবার চেষ্টা করুন" android:layout_marginTop="10dp"/>
+              </LinearLayout>
+          </RelativeLayout>
+          EOF
+
+          # ৫. MainActivity.kt (সব লজিক একসাথে)
           cat <<EOF > app/src/main/java/com/vibestudio/geminiai/MainActivity.kt
           package com.vibestudio.geminiai
           import android.Manifest
           import android.os.Bundle
+          import android.view.View
           import android.webkit.*
+          import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
           import androidx.core.app.ActivityCompat
 
           class MainActivity : AppCompatActivity() {
+              private lateinit var webView: WebView
+              private lateinit var splash: View
+              private lateinit var offline: View
+
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  val webView = WebView(this)
-                  setContentView(webView)
+                  setContentView(R.layout.activity_main)
+                  
+                  webView = findViewById(R.id.webView)
+                  splash = findViewById(R.id.splashScreen)
+                  offline = findViewById(R.id.offlineScreen)
+
                   ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA), 1)
+
                   webView.settings.apply {
                       javaScriptEnabled = true
                       domStorageEnabled = true
                       mediaPlaybackRequiresUserGesture = false
-                      allowFileAccess = true
                   }
-                  webView.webViewClient = WebViewClient()
-                  webView.webChromeClient = object : WebChromeClient() {
-                      override fun onPermissionRequest(request: PermissionRequest) {
-                          request.grant(request.resources)
+
+                  webView.webViewClient = object : WebViewClient() {
+                      override fun onPageFinished(view: WebView?, url: String?) {
+                          splash.visibility = View.GONE
+                          webView.visibility = View.VISIBLE
+                      }
+                      override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                          webView.visibility = View.GONE
+                          offline.visibility = View.VISIBLE
                       }
                   }
+                  
+                  findViewById<Button>(R.id.retryBtn).setOnClickListener {
+                      offline.visibility = View.GONE
+                      splash.visibility = View.VISIBLE
+                      webView.loadUrl("https://gemini.google.com/")
+                  }
+
                   webView.loadUrl("https://gemini.google.com/")
               }
+              override fun onBackPressed() { if(webView.canGoBack()) webView.goBack() else super.onBackPressed() }
           }
           EOF
 
-          # ৬. AndroidManifest.xml
+          # ৬. Manifest & Icon
           cat <<EOF > app/src/main/res/values/themes.xml
           <resources><style name="Theme.GeminiAi" parent="Theme.MaterialComponents.DayNight.NoActionBar"/></resources>
           EOF
+          
+          # অফিসিয়াল আইকন ডাউনলোড
+          curl -L "https://cdn-icons-png.flaticon.com/512/10561/10561102.png" -o app/src/main/res/mipmap-hdpi/ic_launcher.png
 
           cat <<EOF > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-              <uses-permission android:name="android.permission.CAMERA"/>
-              <application android:label="Gemini Ai" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
+              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.CAMERA"/>
+              <application android:label="Gemini Ai" android:icon="@mipmap/ic_launcher" android:theme="@style/Theme.GeminiAi" android:hardwareAccelerated="true">
+                  <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
               </application>
           </manifest>
           EOF
 
-      - name: Generate Wrapper and Build
+      - name: Build with Gradle
         run: |
           gradle wrapper --gradle-version 8.1.1
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: Upload Native APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gemini-Native-Fixed
+          name: Gemini-Native-Pro
           path: app/build/outputs/apk/release/app-release-unsigned.apk
